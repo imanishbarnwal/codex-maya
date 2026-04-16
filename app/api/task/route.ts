@@ -3,9 +3,26 @@ import { generateOpenAIJson } from "@/lib/openai-server";
 import type { MayaCharacter } from "@/lib/maya-data";
 
 export async function POST(request: Request) {
-  const { character: payloadCharacter, task } = await request.json();
+  let body: { character?: unknown; task?: unknown } = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const { character: payloadCharacter, task } = body;
   const character = (payloadCharacter ?? arjun) as MayaCharacter;
   const fallbackArtifact = compileTaskArtifact(character, String(task ?? "Create a practical plan."));
+  const isArjun = character.slug === "arjun" || character.name.toLowerCase() === "arjun";
+
+  if (isArjun) {
+    return Response.json({
+      artifact: fallbackArtifact,
+      lifeTraceEvent: traceForArtifact(fallbackArtifact),
+      generatedBy: "arjun-demo-fallback",
+    });
+  }
+
   const generated = await generateOpenAIJson<{
     artifact?: Partial<typeof fallbackArtifact>;
     lifeTraceEvent?: MayaCharacter["lifeTrace"][number];
@@ -37,19 +54,19 @@ export async function POST(request: Request) {
     id: generated?.artifact?.id || fallbackArtifact.id,
     title: generated?.artifact?.title || fallbackArtifact.title,
     type: generated?.artifact?.type || fallbackArtifact.type,
-    content: generated?.artifact?.content?.length ? generated.artifact.content : fallbackArtifact.content,
+    content: normalizeStringArray(generated?.artifact?.content, fallbackArtifact.content),
     createdBy: generated?.artifact?.createdBy || fallbackArtifact.createdBy,
-    usedContext: generated?.artifact?.usedContext?.length
-      ? generated.artifact.usedContext
-      : fallbackArtifact.usedContext,
+    usedContext: normalizeStringArray(generated?.artifact?.usedContext, fallbackArtifact.usedContext),
     createdAt: generated?.artifact?.createdAt || fallbackArtifact.createdAt,
   };
+  const lifeTraceCandidate = generated?.lifeTraceEvent;
   const lifeTraceEvent = {
-    agent: "Task Agent",
-    artifact: `Created artifact: ${artifact.title}.`,
-    detail: `Used ${artifact.usedContext.join(", ")} to produce a ${artifact.type} output.`,
-    status: "complete",
-    ...(generated?.lifeTraceEvent ?? {}),
+    ...(lifeTraceCandidate ?? {}),
+    ...traceForArtifact(artifact),
+    agent: lifeTraceCandidate?.agent || traceForArtifact(artifact).agent,
+    artifact: lifeTraceCandidate?.artifact || traceForArtifact(artifact).artifact,
+    detail: lifeTraceCandidate?.detail || traceForArtifact(artifact).detail,
+    status: lifeTraceCandidate?.status || traceForArtifact(artifact).status,
   };
 
   return Response.json({
@@ -57,4 +74,19 @@ export async function POST(request: Request) {
     lifeTraceEvent,
     generatedBy: generated ? "openai-responses-api" : "local-maya-compiler",
   });
+}
+
+function traceForArtifact(artifact: ReturnType<typeof compileTaskArtifact>) {
+  return {
+    agent: "Task Agent",
+    artifact: `Created artifact: ${artifact.title}.`,
+    detail: `Used ${artifact.usedContext.join(", ")} to produce a ${artifact.type} output.`,
+    status: "complete",
+  };
+}
+
+function normalizeStringArray(value: unknown, fallback: string[]) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string") && value.length
+    ? value
+    : fallback;
 }

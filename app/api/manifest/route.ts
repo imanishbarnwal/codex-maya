@@ -8,6 +8,16 @@ type ManifestOptions = {
   avatarMode?: string;
 };
 
+const relationshipModes: RelationshipMode[] = [
+  "friend",
+  "assistant",
+  "muse",
+  "npc",
+  "guide",
+  "operator",
+  "coach",
+];
+
 const relationshipGuidance: Record<RelationshipMode, string> = {
   friend:
     "Tune voice warm and casual. Journal entries feel emotional and personal. Task skills lean toward reflection, reminders, small thoughtful outputs.",
@@ -26,9 +36,16 @@ const relationshipGuidance: Record<RelationshipMode, string> = {
 };
 
 export async function POST(request: Request) {
-  const { seed, options } = await request.json();
+  let body: { seed?: unknown; options?: ManifestOptions } = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const { seed, options } = body;
   const manifestOptions = (options ?? {}) as ManifestOptions;
-  const relationshipMode: RelationshipMode = manifestOptions.relationshipMode ?? "friend";
+  const relationshipMode = normalizeRelationshipMode(manifestOptions.relationshipMode);
   const fallbackCharacter: MayaCharacter = {
     ...compileMayaCharacter(String(seed ?? "")),
     relationshipMode,
@@ -76,6 +93,12 @@ export async function POST(request: Request) {
     character,
     generatedBy: generated ? "openai-responses-api" : "local-maya-compiler",
   });
+}
+
+function normalizeRelationshipMode(value: unknown): RelationshipMode {
+  return relationshipModes.includes(value as RelationshipMode)
+    ? (value as RelationshipMode)
+    : "friend";
 }
 
 function normalizeCharacter(candidate: Partial<MayaCharacter> | undefined, fallback: MayaCharacter): MayaCharacter {

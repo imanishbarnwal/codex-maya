@@ -34,6 +34,7 @@ import {
   Zap,
 } from "lucide-react";
 import { AvatarStage, type AvatarMode } from "@/app/avatar-stage";
+import { TicTacToe } from "@/app/arcade";
 import {
   arjun,
   demoSeeds,
@@ -48,7 +49,7 @@ import {
   type VoicePreference,
 } from "@/lib/voice";
 
-type Message = { role: "maya" | "you"; text: string };
+type Message = { role: "maya" | "you"; text: string; widget?: "tic-tac-toe" };
 type TabId = "website" | "life" | "work" | "trace";
 type OutputKey = "website" | "journal" | "memories" | "project" | "avatar" | "chat" | "trace";
 
@@ -79,6 +80,8 @@ const outputOptions: { key: OutputKey; label: string; description: string }[] = 
   { key: "chat", label: "Chat", description: "Talk to them" },
   { key: "trace", label: "Life Trace", description: "Inspectable build" },
 ];
+
+const requiredDemoOutputs: OutputKey[] = ["project", "chat", "trace"];
 
 const relationshipOptions: {
   key: RelationshipMode;
@@ -201,6 +204,7 @@ export default function Home() {
   const [isSending, setIsSending] = useState(false);
   const [isTasking, setIsTasking] = useState(false);
   const [artifacts, setArtifacts] = useState<MayaArtifact[]>([]);
+  const [latestArtifactId, setLatestArtifactId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("website");
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -325,8 +329,15 @@ export default function Home() {
       const response = await fetch("/api/manifest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seed: nextSeed, options: manifestOptions }),
+        body: JSON.stringify({
+          seed: nextSeed,
+          options: {
+            ...manifestOptions,
+            outputs: Array.from(new Set([...manifestOptions.outputs, ...requiredDemoOutputs])),
+          },
+        }),
       });
+      if (!response.ok) throw new Error("Manifest request failed");
       const data = await response.json();
       const nextCharacter: MayaCharacter = {
         ...(data.character as MayaCharacter),
@@ -335,6 +346,7 @@ export default function Home() {
       };
       setCharacter(nextCharacter);
       setArtifacts(nextCharacter.artifacts);
+      setLatestArtifactId(null);
       const relationship = relationshipOptions.find((r) => r.key === nextCharacter.relationshipMode);
       setMessages([
         {
@@ -351,6 +363,7 @@ export default function Home() {
       };
       setCharacter(fallback);
       setArtifacts(arjun.artifacts);
+      setLatestArtifactId(null);
       setMessages([
         {
           role: "maya",
@@ -362,8 +375,32 @@ export default function Home() {
     }
   }
 
+  function playTicTacToe(userPrompt = "Let's play tic-tac-toe.") {
+    setInput("");
+    setMessages((current) => [
+      ...current,
+      { role: "you", text: userPrompt },
+      {
+        role: "maya",
+        text: `You're on. Your move — I'm ○, you're ×.`,
+      },
+      { role: "maya", text: "", widget: "tic-tac-toe" },
+    ]);
+  }
+
   async function sendMessage(message = input) {
     if (!message.trim() || isSending) return;
+
+    const lower = message.toLowerCase();
+    if (
+      /tic[\s-]?tac[\s-]?toe/.test(lower) ||
+      /\blet'?s play\b/.test(lower) ||
+      /\bplay (a )?game\b/.test(lower) ||
+      /\bplay with you\b/.test(lower)
+    ) {
+      playTicTacToe(message);
+      return;
+    }
 
     const nextInput = message;
     setInput("");
@@ -380,6 +417,7 @@ export default function Home() {
           relationshipMode: character.relationshipMode || manifestOptions.relationshipMode,
         }),
       });
+      if (!response.ok) throw new Error("Chat request failed");
       const data = await response.json();
       setMessages((current) => [...current, { role: "maya", text: data.reply }]);
     } catch {
@@ -406,10 +444,12 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ character, task }),
       });
+      if (!response.ok) throw new Error("Task request failed");
       const data = await response.json();
       const artifact = data.artifact as MayaArtifact;
       const lifeTraceEvent = data.lifeTraceEvent as MayaCharacter["lifeTrace"][number];
 
+      setLatestArtifactId(artifact.id);
       setArtifacts((current) => [artifact, ...current]);
       setCharacter((current) => ({
         ...current,
@@ -424,7 +464,7 @@ export default function Home() {
           text: `I made an artifact: ${artifact.title}. Saved in my world and recorded in Life Trace.`,
         },
       ]);
-      showToast(`Artifact saved · Trace updated`);
+      showToast(`Artifact saved · Life Trace updated`);
     } catch {
       setMessages((current) => [
         ...current,
@@ -505,6 +545,7 @@ export default function Home() {
         <InhabitStep
           character={character}
           artifacts={artifacts}
+          latestArtifactId={latestArtifactId}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           messages={messages}
@@ -527,6 +568,7 @@ export default function Home() {
           speaking={speaking}
           cancelSpeak={cancelSpeak}
           speakText={speakText}
+          onPlayGame={() => playTicTacToe()}
         />
       )}
 
@@ -691,6 +733,8 @@ function CreateStep({
   const rotatingUseCase = relationshipOptions[useCaseIndex];
 
   function toggleOutput(output: OutputKey) {
+    if (requiredDemoOutputs.includes(output)) return;
+
     setOptions((current) => {
       const hasOutput = current.outputs.includes(output);
       if (hasOutput && current.outputs.length === 1) return current;
@@ -809,7 +853,7 @@ function CreateStep({
                     type="button"
                     onClick={seedListening ? seedStop : seedStart}
                     aria-label={seedListening ? "Stop recording" : "Speak your seed"}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-label transition ${
+                    className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-[11px] font-medium transition ${
                       seedListening
                         ? "border-[#f5a45d]/60 bg-[#f5a45d]/15 text-[#f5a45d] shadow-[0_0_18px_0_rgba(245,164,93,0.4)]"
                         : "hairline bg-white/[0.04] text-[#c9b998] hover:border-[#f5a45d]/40 hover:text-[#f5a45d]"
@@ -821,7 +865,7 @@ function CreateStep({
                       </>
                     ) : (
                       <>
-                        <Mic size={10} /> Speak seed
+                        <Mic size={11} /> Speak
                       </>
                     )}
                   </button>
@@ -943,24 +987,34 @@ function CreateStep({
                 </span>
               </div>
               <p className="mt-1.5 text-[11.5px] text-[#8f7f64]">
-                Turn modules off to keep the demo lean. Core (identity + chat) always ships.
+                Turn modules off to keep the demo lean. Project, chat, and trace stay on for the winning demo loop.
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {outputOptions.map((item) => {
                   const active = options.outputs.includes(item.key);
+                  const required = requiredDemoOutputs.includes(item.key);
                   return (
                     <button
                       key={item.key}
                       type="button"
                       onClick={() => toggleOutput(item.key)}
+                      disabled={required}
                       className={`rounded-xl border px-3 py-2.5 text-left transition ${
                         active
                           ? "border-[#f5a45d]/45 bg-[#f5a45d]/10 text-[#f7ead2]"
                           : "hairline bg-white/[0.02] text-[#8f7f64] hover:text-[#decaa6]"
-                      }`}
+                      } ${required ? "cursor-default opacity-90" : ""}`}
+                      title={required ? "Required for task, artifact, and Life Trace demo loop" : undefined}
                     >
-                      <span className="block font-display text-[14px] leading-tight">
-                        {item.label}
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="block font-display text-[14px] leading-tight">
+                          {item.label}
+                        </span>
+                        {required && (
+                          <span className="font-mono text-[9px] uppercase tracking-label text-[#9fb07f]">
+                            core
+                          </span>
+                        )}
                       </span>
                       <span className="mt-1 block text-[10.5px] leading-snug text-[#8f7f64]">
                         {item.description}
@@ -1175,6 +1229,7 @@ function ManifestStep({
 function InhabitStep({
   character,
   artifacts,
+  latestArtifactId,
   activeTab,
   setActiveTab,
   messages,
@@ -1197,9 +1252,11 @@ function InhabitStep({
   speaking,
   cancelSpeak,
   speakText,
+  onPlayGame,
 }: {
   character: MayaCharacter;
   artifacts: MayaArtifact[];
+  latestArtifactId: string | null;
   activeTab: TabId;
   setActiveTab: (t: TabId) => void;
   messages: Message[];
@@ -1222,6 +1279,7 @@ function InhabitStep({
   speaking: boolean;
   cancelSpeak: () => void;
   speakText: (text: string) => void;
+  onPlayGame: () => void;
 }) {
   const primaryTask = character.taskSkills[0];
   const latestTrace = character.lifeTrace.at(-1);
@@ -1290,10 +1348,12 @@ function InhabitStep({
             <WorkPanel
               character={character}
               artifacts={artifacts}
+              latestArtifactId={latestArtifactId}
               runTask={runTask}
               isTasking={isTasking}
               latestTrace={latestTrace}
               onOpenTrace={() => setActiveTab("trace")}
+              speakText={speakText}
             />
           )}
           {activeTab === "trace" && <TracePanel character={character} />}
@@ -1318,6 +1378,7 @@ function InhabitStep({
             speaking={speaking}
             cancelSpeak={cancelSpeak}
             speakText={speakText}
+            onPlayGame={onPlayGame}
           />
         </aside>
       </div>
@@ -1622,18 +1683,23 @@ function LifePanel({ character }: { character: MayaCharacter }) {
 function WorkPanel({
   character,
   artifacts,
+  latestArtifactId,
   runTask,
   isTasking,
   latestTrace,
   onOpenTrace,
+  speakText,
 }: {
   character: MayaCharacter;
   artifacts: MayaArtifact[];
+  latestArtifactId: string | null;
   runTask: (task: string) => void;
   isTasking: boolean;
   latestTrace?: MayaCharacter["lifeTrace"][number];
   onOpenTrace: () => void;
+  speakText: (text: string) => void;
 }) {
+  void speakText;
   return (
     <div className="space-y-5">
       <div className="glass panel-grain relative overflow-hidden rounded-3xl p-7 md:p-8">
@@ -1747,16 +1813,27 @@ function WorkPanel({
             {artifacts.map((artifact, i) => (
               <article
                 key={artifact.id}
-                className="animate-rise relative overflow-hidden rounded-2xl border border-[#f5a45d]/25 bg-gradient-to-br from-[#f5a45d]/[0.08] to-transparent p-5"
+                className={`animate-rise relative overflow-hidden rounded-2xl border bg-gradient-to-br from-[#f5a45d]/[0.08] to-transparent p-5 ${
+                  artifact.id === latestArtifactId
+                    ? "border-[#f5a45d]/70 shadow-[0_22px_70px_-28px_rgba(245,164,93,0.8)]"
+                    : "border-[#f5a45d]/25"
+                }`}
                 style={{ animationDelay: `${i * 60}ms` }}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[10px] uppercase tracking-label text-[#f5a45d]">
                     {artifact.type}
                   </span>
-                  <span className="font-mono text-[10px] uppercase tracking-label text-[#a39378]">
-                    {artifact.createdBy}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {artifact.id === latestArtifactId && (
+                      <span className="rounded-full border border-[#9fb07f]/35 bg-[#9fb07f]/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-label text-[#9fb07f]">
+                        new
+                      </span>
+                    )}
+                    <span className="font-mono text-[10px] uppercase tracking-label text-[#a39378]">
+                      {artifact.createdBy}
+                    </span>
+                  </div>
                 </div>
                 <h3 className="mt-3 font-display text-[19px] leading-snug">{artifact.title}</h3>
                 <div className="mt-3 space-y-2 text-[13px] leading-[1.7] text-[#c9b998]">
@@ -1834,6 +1911,7 @@ function ChatPanel({
   speaking,
   cancelSpeak,
   speakText,
+  onPlayGame,
 }: {
   character: MayaCharacter;
   messages: Message[];
@@ -1852,6 +1930,7 @@ function ChatPanel({
   speaking: boolean;
   cancelSpeak: () => void;
   speakText: (text: string) => void;
+  onPlayGame: () => void;
 }) {
   const RelIcon = relationship.icon;
   const {
@@ -1894,16 +1973,26 @@ function ChatPanel({
           <p className="font-mono text-[10px] uppercase tracking-label text-[#a39378]">
             Ask something
           </p>
-          {onRunTask && primaryTaskLabel && (
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
-              onClick={onRunTask}
-              disabled={isTasking}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#f5a45d]/35 bg-[#f5a45d]/[0.08] px-2.5 py-1 font-mono text-[10px] uppercase tracking-label text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/[0.12] disabled:opacity-60"
+              onClick={onPlayGame}
+              title="Play tic-tac-toe in chat"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#9fb07f]/35 bg-[#9fb07f]/[0.08] px-3 py-1 text-[11px] font-medium text-[#9fb07f] transition hover:border-[#9fb07f]/60 hover:bg-[#9fb07f]/[0.14]"
             >
-              {isTasking ? <Loader2 size={10} className="animate-spin" /> : <Wand2 size={10} />}
-              Quick task
+              <Gamepad2 size={11} /> Play
             </button>
-          )}
+            {onRunTask && primaryTaskLabel && (
+              <button
+                onClick={onRunTask}
+                disabled={isTasking}
+                title={`Run: ${primaryTaskLabel}`}
+                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#f5a45d]/35 bg-[#f5a45d]/[0.08] px-3 py-1 text-[11px] font-medium text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/[0.12] disabled:opacity-60"
+              >
+                {isTasking ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+                Quick task
+              </button>
+            )}
+          </div>
         </div>
         <div className="grid gap-1.5">
           {demoPrompts.map((prompt) => (
@@ -1923,31 +2012,46 @@ function ChatPanel({
         ref={chatScrollRef}
         className="scrollbar-thin mt-4 flex-1 space-y-3 overflow-y-auto rounded-2xl border hairline bg-black/20 p-4"
       >
-        {messages.map((message, index) => (
-          <div
-            key={`${message.role}-${index}`}
-            className={`group/msg flex ${message.role === "you" ? "justify-end" : "justify-start"}`}
-          >
+        {messages.map((message, index) => {
+          if (message.widget === "tic-tac-toe") {
+            return (
+              <div key={`widget-${index}`} className="flex justify-start">
+                <div className="w-full max-w-[92%] rounded-2xl rounded-bl-sm border border-[#f5a45d]/30 bg-gradient-to-br from-[#f5a45d]/[0.08] to-transparent p-3">
+                  <TicTacToe
+                    characterName={character.name}
+                    onEnd={(text) => speakText(text)}
+                  />
+                </div>
+              </div>
+            );
+          }
+          if (!message.text) return null;
+          return (
             <div
-              className={`relative max-w-[85%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-[1.65] ${
-                message.role === "you"
-                  ? "rounded-br-sm bg-gradient-to-br from-[#f5a45d] to-[#c97b36] text-[#0a0806]"
-                  : "rounded-bl-sm border hairline bg-white/[0.04] text-[#f7ead2]"
-              }`}
+              key={`${message.role}-${index}`}
+              className={`group/msg flex ${message.role === "you" ? "justify-end" : "justify-start"}`}
             >
-              {message.text}
-              {message.role === "maya" && (
-                <button
-                  onClick={() => speakText(message.text)}
-                  aria-label="Play voice"
-                  className="absolute -right-1 -top-1 grid size-6 place-items-center rounded-full border border-[#f5a45d]/30 bg-[#0a0806] text-[#f5a45d] opacity-0 transition group-hover/msg:opacity-100 hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/10"
-                >
-                  <Volume2 size={11} />
-                </button>
-              )}
+              <div
+                className={`relative max-w-[85%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-[1.65] ${
+                  message.role === "you"
+                    ? "rounded-br-sm bg-gradient-to-br from-[#f5a45d] to-[#c97b36] text-[#0a0806]"
+                    : "rounded-bl-sm border hairline bg-white/[0.04] text-[#f7ead2]"
+                }`}
+              >
+                {message.text}
+                {message.role === "maya" && (
+                  <button
+                    onClick={() => speakText(message.text)}
+                    aria-label="Play voice"
+                    className="absolute -right-1 -top-1 grid size-6 place-items-center rounded-full border border-[#f5a45d]/30 bg-[#0a0806] text-[#f5a45d] opacity-0 transition group-hover/msg:opacity-100 hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/10"
+                  >
+                    <Volume2 size={11} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {isSending && (
           <div className="flex justify-start">
             <div className="rounded-2xl rounded-bl-sm border hairline bg-white/[0.04] px-4 py-3">

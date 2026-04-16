@@ -18,12 +18,36 @@ const modeInstructions: Record<RelationshipMode, string> = {
     "Speak as a thoughtful coach: ask a sharp question back, reflect what you hear, help the user commit to one next move.",
 };
 
+const relationshipModes: RelationshipMode[] = [
+  "friend",
+  "assistant",
+  "muse",
+  "npc",
+  "guide",
+  "operator",
+  "coach",
+];
+
 export async function POST(request: Request) {
-  const { message, character: payloadCharacter, relationshipMode } = await request.json();
+  let body: { message?: unknown; character?: unknown; relationshipMode?: unknown } = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const { message, character: payloadCharacter, relationshipMode } = body;
   const character = (payloadCharacter ?? arjun) as MayaCharacter;
   const mode: RelationshipMode =
-    (relationshipMode as RelationshipMode) || character.relationshipMode || "friend";
+    normalizeRelationshipMode(relationshipMode || character.relationshipMode);
   const userMessage = String(message ?? "").trim();
+  const arjunReply = arjunDemoReply(userMessage, character, mode);
+  if (arjunReply) {
+    return Response.json({
+      reply: arjunReply,
+      generatedBy: "arjun-demo-fallback",
+    });
+  }
 
   const generated = await generateOpenAIJson<{ reply: string }>({
     schema: {
@@ -62,6 +86,80 @@ export async function POST(request: Request) {
     reply,
     generatedBy: generated ? "openai-responses-api" : "local-fallback",
   });
+}
+
+function arjunDemoReply(
+  message: string,
+  character: MayaCharacter,
+  mode: RelationshipMode,
+) {
+  const isArjun = character.slug === "arjun" || character.name.toLowerCase() === "arjun";
+  if (!isArjun) return null;
+
+  const lower = message.toLowerCase().trim();
+  const project = character.project.name;
+
+  if (lower.includes("what is monsoon") || lower.includes("what is monsoon run")) {
+    return "Monsoon Run is a tiny one-button reflex game about crossing Bengaluru before the storm meter eats the road. You dodge potholes, puddles, scooters, and traffic cones, but the real enemy is panic. Very realistic, sadly.";
+  }
+
+  if (lower.includes("journal") || lower.includes("yesterday") || lower.includes("wrote")) {
+    return "My latest journal entry is \"Koramangala as a maze.\" The road outside flooded again, so I turned it into a level: cones as soft blockers, scooters as panic punctuation, potholes as tiny betrayals. Maybe the city is not broken; maybe it is aggressively playtesting me.";
+  }
+
+  if (lower.includes("bengaluru") || lower.includes("bangalore") || lower.includes("city")) {
+    return "Bengaluru is my environment art and my villain system. Rain makes the trees cinematic, traffic makes timing matter, and every flooded lane becomes a level design note. The city is beautiful, generous, and absolutely committed to testing my collision logic.";
+  }
+
+  if (lower.includes("3-day") || lower.includes("three day") || lower.includes("sprint")) {
+    return "Day 1: lock the 20-second loop: movement, storm meter, potholes, restart. Day 2: build the Indiranagar slice with puddles, scooters, cones, and one street dog cameo. Day 3: polish sound, instructions, devlog, and pitch, then ship before doubt gets a chair in the meeting.";
+  }
+
+  if (lower.includes("level") || lower.includes("indiranagar")) {
+    return "I would build Indiranagar After First Rain: narrow lanes, scooters on the edges, puddles that tug you sideways, and one fake pothole that is only a reflection. If the player panic-swerves, they hit a real cone. Bengaluru as psychological thriller.";
+  }
+
+  if (lower.includes("npc") || lower.includes("dialogue") || lower.includes("chai") || lower.includes("dog")) {
+    return "Chai vendor: \"The rain has already read your calendar.\" Delivery rider: \"I know a shortcut. So does every pothole.\" Street dog: \"Bark once for left, twice for doom.\" I would keep the lines tiny; nobody wants a lore dump while hydroplaning.";
+  }
+
+  if (lower.includes("pitch") || lower.includes("judge") || lower.includes("demo")) {
+    return "Most AI characters are chat windows wearing costumes. MAYA builds the life first: identity, world, journal, project, task skills, avatar, and trace. I am the proof: you can inspect my world, ask me about Monsoon Run, and make me produce real artifacts from the context MAYA built.";
+  }
+
+  if (lower.includes("friend") || lower.includes("assistant") || lower.includes("what can you do")) {
+    const modeLine =
+      mode === "assistant"
+        ? "As your assistant, I can turn messy ideas into plans, checklists, devlogs, and launch notes."
+        : mode === "muse"
+          ? "As your muse, I can make level ideas, dialogue, tiny scenes, and weird mechanics with a pulse."
+          : "As a friend, I can talk like an actual person, remember my little world, and still help you make something useful.";
+    return `${modeLine} For the demo, ask me for a sprint plan, a monsoon level, NPC dialogue, today's devlog, or why MAYA is not just a chatbot.`;
+  }
+
+  if (lower.includes("why") && (lower.includes("chatbot") || lower.includes("maya"))) {
+    return "A chatbot starts with a blank box and a costume. MAYA gave me a life first: Koramangala, journal entries, memories, Monsoon Run, task skills, avatar, and Life Trace. The chat is just the door; the room already exists.";
+  }
+
+  if (lower.includes("how") && lower.includes("maya") && (lower.includes("build") || lower.includes("built"))) {
+    return "MAYA built me in layers: Identity Agent gave me voice, World Agent gave me Koramangala rain, Journal Agent gave me recent days, Project Agent gave me Monsoon Run, Task Agent gave me useful work, and Life Trace recorded the whole thing. I am not starting from a blank prompt, which is honestly a relief for both of us.";
+  }
+
+  if (lower.includes("food") || lower.includes("vegan") || lower.includes("eat")) {
+    return "Dosa, dal, peanut chutney, filter coffee, and the occasional suspicious vegan brownie from Indiranagar. My cooking style is mostly \"will this compile before the sambar gets cold?\"";
+  }
+
+  if (lower.includes("how are you") || lower === "hi" || lower === "hey" || lower === "hello") {
+    return "Hey. I am good, slightly rain-soaked in spirit. I got the puddle physics to feel less like soup today, which is my current definition of inner peace. How are you holding up?";
+  }
+
+  return null;
+}
+
+function normalizeRelationshipMode(value: unknown): RelationshipMode {
+  return relationshipModes.includes(value as RelationshipMode)
+    ? (value as RelationshipMode)
+    : "friend";
 }
 
 function pick<T>(items: T[]): T {
