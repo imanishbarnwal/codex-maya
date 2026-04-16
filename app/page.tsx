@@ -35,6 +35,8 @@ import {
 } from "lucide-react";
 import { AvatarStage, type AvatarMode } from "@/app/avatar-stage";
 import { TicTacToe } from "@/app/arcade";
+import { TelegramSend } from "@/app/telegram-card";
+import { parseTelegramIntent } from "@/lib/telegram-intent";
 import {
   arjun,
   demoSeeds,
@@ -49,7 +51,12 @@ import {
   type VoicePreference,
 } from "@/lib/voice";
 
-type Message = { role: "maya" | "you"; text: string; widget?: "tic-tac-toe" };
+type Message = {
+  role: "maya" | "you";
+  text: string;
+  widget?: "tic-tac-toe" | "telegram";
+  telegram?: { recipient: string; text: string };
+};
 type TabId = "website" | "life" | "work" | "trace";
 type OutputKey = "website" | "journal" | "memories" | "project" | "avatar" | "chat" | "trace";
 
@@ -402,6 +409,26 @@ export default function Home() {
       return;
     }
 
+    const telegramIntent = parseTelegramIntent(message);
+    if (telegramIntent) {
+      setInput("");
+      setMessages((current) => [
+        ...current,
+        { role: "you", text: message },
+        {
+          role: "maya",
+          text: `On it — pinging ${telegramIntent.recipient} on Telegram.`,
+        },
+        {
+          role: "maya",
+          text: "",
+          widget: "telegram",
+          telegram: telegramIntent,
+        },
+      ]);
+      return;
+    }
+
     const nextInput = message;
     setInput("");
     setMessages((current) => [...current, { role: "you", text: nextInput }]);
@@ -600,8 +627,8 @@ function TopNav({
         className="group flex items-center gap-3.5 rounded-2xl pr-4 text-left transition hover:bg-white/[0.035]"
         aria-label="Go home"
       >
-        <div className="relative grid size-10 place-items-center rounded-xl border border-[#f5a45d]/35 bg-gradient-to-br from-[#f5a45d]/20 to-[#c97b36]/10 shadow-[0_0_30px_-5px_rgba(245,164,93,0.4)]">
-          <Sparkles size={16} className="text-[#f5a45d]" />
+        <div className="relative grid size-10 place-items-center rounded-xl border border-[#f5a45d]/35 shadow-[0_0_30px_-5px_rgba(245,164,93,0.4)] overflow-hidden">
+          <img src="/logo.png" alt="MAYA Logo" className="size-full object-cover" />
         </div>
         <div>
           <p className="font-display text-[19px] font-medium tracking-[0.32em] transition group-hover:text-[#f5a45d]">
@@ -616,7 +643,7 @@ function TopNav({
         {step !== "create" && (
           <button
             onClick={onHome}
-            className="rounded-full border border-[#f5a45d]/25 bg-[#f5a45d]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-label text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/15 md:px-3.5 md:text-[11px]"
+            className="rounded-full border border-[#f5a45d]/20 bg-white/[0.025] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.18em] text-[#c9b998] transition hover:border-[#f5a45d]/45 hover:bg-[#f5a45d]/10 hover:text-[#f5a45d] md:px-3 md:text-[10px]"
           >
             New life
           </button>
@@ -1504,23 +1531,7 @@ function HeroStrip({
           avatarMode={avatarMode}
           relationshipMode={relationship.key}
         />
-        <div className="pointer-events-none absolute bottom-5 right-5 z-10">
-          <div className="glass flex items-center gap-3 rounded-2xl px-3 py-2 backdrop-blur">
-            <div className="relative size-11 overflow-hidden rounded-xl border border-[#f5a45d]/35 bg-[#0a0806]">
-              <img
-                src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(character.slug)}&backgroundColor=1f1812,27221b`}
-                alt={`${character.name} portrait`}
-                className="size-full object-cover"
-              />
-            </div>
-            <div className="leading-tight">
-              <p className="font-display text-[13px] text-[#f7ead2]">{character.name}</p>
-              <p className="font-mono text-[9px] uppercase tracking-label text-[#8f7f64]">
-                portrait · dicebear
-              </p>
-            </div>
-          </div>
-        </div>
+
         <div className="pointer-events-none absolute left-5 right-5 top-5 z-10 flex flex-wrap gap-1.5">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#9fb07f]/30 bg-[#9fb07f]/15 px-3 py-1 text-[10px] uppercase tracking-label text-[#c9d6ae] backdrop-blur">
             <span className="live-dot" />
@@ -1545,9 +1556,9 @@ function HeroStrip({
             </span>
             <button
               onClick={onReset}
-              className="relative z-10 inline-flex items-center gap-2 rounded-full border border-[#f5a45d]/25 bg-[#f5a45d]/10 px-4 py-2 text-[11px] uppercase tracking-label text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/15 hover:text-[#f7ead2]"
+              className="relative z-10 inline-flex items-center gap-1.5 rounded-full border border-[#f5a45d]/20 bg-white/[0.025] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[#c9b998] transition hover:border-[#f5a45d]/45 hover:bg-[#f5a45d]/10 hover:text-[#f5a45d]"
             >
-              <RefreshCw size={11} /> Edit seed
+              <RefreshCw size={10} /> Edit seed
             </button>
           </div>
           <h1 className="hero-title mt-7 text-5xl md:text-6xl">
@@ -2020,6 +2031,19 @@ function ChatPanel({
                   <TicTacToe
                     characterName={character.name}
                     onEnd={(text) => speakText(text)}
+                  />
+                </div>
+              </div>
+            );
+          }
+          if (message.widget === "telegram" && message.telegram) {
+            return (
+              <div key={`tg-${index}`} className="flex justify-start">
+                <div className="w-full max-w-[92%] rounded-2xl rounded-bl-sm border border-[#7fb3d4]/30 bg-gradient-to-br from-[#7fb3d4]/[0.1] to-transparent p-4">
+                  <TelegramSend
+                    recipient={message.telegram.recipient}
+                    text={message.telegram.text}
+                    fromName={character.name}
                   />
                 </div>
               </div>
