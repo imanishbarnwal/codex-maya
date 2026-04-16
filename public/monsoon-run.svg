@@ -1,0 +1,34 @@
+<svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="540" fill="#11130f"/>
+  <rect y="332" width="960" height="208" fill="#1b241a"/>
+  <path d="M0 333C122 289 246 289 372 333C496 376 617 377 738 334C817 306 891 301 960 319V540H0V333Z" fill="#263623"/>
+  <path d="M114 344C226 310 346 312 475 349C594 383 711 379 826 336" stroke="#9fb07f" stroke-width="8" stroke-linecap="round" opacity=".45"/>
+  <rect x="0" y="0" width="960" height="540" fill="url(#rain)" opacity=".55"/>
+  <circle cx="162" cy="386" r="44" fill="#f5a45d"/>
+  <circle cx="160" cy="384" r="20" fill="#11130f"/>
+  <rect x="188" y="336" width="76" height="16" rx="8" fill="#f5a45d"/>
+  <rect x="222" y="306" width="18" height="52" rx="8" fill="#f5a45d"/>
+  <circle cx="286" cy="383" r="36" fill="#f5a45d"/>
+  <circle cx="286" cy="383" r="16" fill="#11130f"/>
+  <path d="M224 308C239 286 258 276 280 278C303 280 318 294 326 318" stroke="#f7ead2" stroke-width="10" stroke-linecap="round"/>
+  <path d="M216 290C236 264 260 251 288 251" stroke="#9fb07f" stroke-width="10" stroke-linecap="round"/>
+  <ellipse cx="613" cy="405" rx="92" ry="24" fill="#11130f" opacity=".65"/>
+  <ellipse cx="612" cy="395" rx="64" ry="17" fill="#2c2117"/>
+  <ellipse cx="778" cy="438" rx="68" ry="19" fill="#11130f" opacity=".6"/>
+  <ellipse cx="778" cy="430" rx="48" ry="13" fill="#2c2117"/>
+  <rect x="687" y="238" width="64" height="112" rx="6" fill="#ead8b8"/>
+  <rect x="765" y="208" width="86" height="142" rx="6" fill="#d3bd91"/>
+  <rect x="709" y="262" width="16" height="18" rx="2" fill="#4f3b25"/>
+  <rect x="791" y="236" width="17" height="18" rx="2" fill="#4f3b25"/>
+  <rect x="821" y="236" width="17" height="18" rx="2" fill="#4f3b25"/>
+  <rect x="791" y="278" width="17" height="18" rx="2" fill="#4f3b25"/>
+  <rect x="821" y="278" width="17" height="18" rx="2" fill="#4f3b25"/>
+  <path d="M89 172C118 127 160 105 215 105C278 105 325 133 357 190C389 180 418 184 445 201C471 218 486 242 490 274H63C58 233 67 199 89 172Z" fill="#46523c"/>
+  <path d="M569 119C590 87 620 71 660 71C706 71 740 92 763 134C786 127 807 130 827 143C846 155 857 172 860 196H550C546 166 552 140 569 119Z" fill="#46523c" opacity=".85"/>
+  <defs>
+    <pattern id="rain" width="34" height="42" patternUnits="userSpaceOnUse" patternTransform="rotate(14)">
+      <path d="M6 0V24" stroke="#f7ead2" stroke-width="3" stroke-linecap="round" opacity=".38"/>
+      <path d="M27 12V36" stroke="#9fb07f" stroke-width="3" stroke-linecap="round" opacity=".3"/>
+    </pattern>
+  </defs>
+</svg>
