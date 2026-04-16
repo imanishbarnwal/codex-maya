@@ -8,6 +8,15 @@ export type MayaArtifact = {
   createdAt: string;
 };
 
+export type RelationshipMode =
+  | "friend"
+  | "assistant"
+  | "muse"
+  | "npc"
+  | "guide"
+  | "operator"
+  | "coach";
+
 export type MayaCharacter = {
   id: string;
   seed: string;
@@ -18,6 +27,7 @@ export type MayaCharacter = {
   city: string;
   essence: string;
   voice: string;
+  relationshipMode?: RelationshipMode;
   avatar: {
     style: string;
     palette: string[];

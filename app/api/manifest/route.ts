@@ -1,10 +1,38 @@
 import { compileMayaCharacter } from "@/lib/maya-data";
 import { generateOpenAIJson } from "@/lib/openai-server";
-import type { MayaCharacter } from "@/lib/maya-data";
+import type { MayaCharacter, RelationshipMode } from "@/lib/maya-data";
+
+type ManifestOptions = {
+  outputs?: string[];
+  relationshipMode?: RelationshipMode;
+  avatarMode?: string;
+};
+
+const relationshipGuidance: Record<RelationshipMode, string> = {
+  friend:
+    "Tune voice warm and casual. Journal entries feel emotional and personal. Task skills lean toward reflection, reminders, small thoughtful outputs.",
+  assistant:
+    "Tune voice crisp and practical. Journal entries feel like work notes. Task skills lean toward plans, summaries, drafts, checklists.",
+  muse:
+    "Tune voice vivid and imaginative. Journal entries feel like creative sketches. Task skills lean toward brainstorms, vignettes, mood boards.",
+  npc:
+    "Tune voice in-world and lore-heavy. Journal entries feel like scroll fragments or quest notes. Task skills lean toward dialogue, quests, scene writing.",
+  guide:
+    "Tune voice calm and symbolic. Journal entries feel dreamlike. Task skills lean toward rituals, reflections, tiny stories.",
+  operator:
+    "Tune voice direct and unsentimental. Journal entries feel like founder notes. Task skills lean toward launch plans, sprints, strategy docs.",
+  coach:
+    "Tune voice reflective and probing. Journal entries feel like coaching observations. Task skills lean toward questions, frameworks, single-move commitments.",
+};
 
 export async function POST(request: Request) {
-  const { seed } = await request.json();
-  const fallbackCharacter = compileMayaCharacter(String(seed ?? ""));
+  const { seed, options } = await request.json();
+  const manifestOptions = (options ?? {}) as ManifestOptions;
+  const relationshipMode: RelationshipMode = manifestOptions.relationshipMode ?? "friend";
+  const fallbackCharacter: MayaCharacter = {
+    ...compileMayaCharacter(String(seed ?? "")),
+    relationshipMode,
+  };
   const generated = await generateOpenAIJson<{ character: Partial<MayaCharacter> }>({
     schema: {
       name: "maya_manifest",
@@ -17,17 +45,32 @@ export async function POST(request: Request) {
         additionalProperties: false,
       },
     },
-    system:
-      "You are MAYA's Manifest Agent. Turn a short person seed into a complete, usable digital life. Return JSON only. Keep outputs vivid, specific, demo-safe, and grounded in the seed. Do not add external actions or unsafe claims.",
+    system: `You are MAYA's Manifest Agent. Turn a short person seed into a complete, usable digital life. Return JSON only. Keep outputs vivid, specific, demo-safe, and grounded in the seed. The user will interact with this character as a ${relationshipMode}. ${relationshipGuidance[relationshipMode]} Prioritize requested modules; keep deselected modules minimal but valid. Do not add external actions or unsafe claims.`,
     user: JSON.stringify({
       seed: String(seed ?? ""),
+      relationshipMode,
+      buildRecipe: {
+        outputs: manifestOptions.outputs ?? [
+          "website",
+          "journal",
+          "memories",
+          "project",
+          "avatar",
+          "chat",
+          "trace",
+        ],
+        avatarMode: manifestOptions.avatarMode ?? "stylized",
+      },
       fallbackShape: fallbackCharacter,
       required:
-        "Return a character with the same shape as fallbackShape: identity, avatar, website, journal, memories, project, taskSkills, artifacts, and lifeTrace.",
+        "Return a character with the same shape as fallbackShape: identity, avatar, website, journal, memories, project, taskSkills, artifacts, lifeTrace.",
     }),
     maxOutputTokens: 2800,
   });
-  const character = normalizeCharacter(generated?.character, fallbackCharacter);
+  const character: MayaCharacter = {
+    ...normalizeCharacter(generated?.character, fallbackCharacter),
+    relationshipMode,
+  };
 
   return Response.json({
     character,

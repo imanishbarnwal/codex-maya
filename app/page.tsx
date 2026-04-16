@@ -6,38 +6,174 @@ import {
   BookOpenText,
   Boxes,
   Check,
+  ChevronDown,
   Code2,
+  Compass,
   Download,
   Gamepad2,
   Globe2,
+  Heart,
   Layers,
+  Lightbulb,
   Loader2,
   MessageCircle,
   NotebookPen,
   RefreshCw,
+  Rocket,
   Send,
   Share2,
   Sparkles,
+  Target,
   User,
   Wand2,
   Zap,
 } from "lucide-react";
 import { AvatarStage } from "@/app/avatar-stage";
-import { arjun, demoSeeds, type MayaArtifact, type MayaCharacter } from "@/lib/maya-data";
+import {
+  arjun,
+  demoSeeds,
+  type MayaArtifact,
+  type MayaCharacter,
+  type RelationshipMode,
+} from "@/lib/maya-data";
 
 type Message = { role: "maya" | "you"; text: string };
 type TabId = "website" | "life" | "work" | "trace";
+type OutputKey = "website" | "journal" | "memories" | "project" | "avatar" | "chat" | "trace";
+type AvatarMode = "stylized" | "cinematic" | "minimal";
+
+type ManifestOptions = {
+  outputs: OutputKey[];
+  relationshipMode: RelationshipMode;
+  avatarMode: AvatarMode;
+};
 
 const defaultSeed =
   "Arjun, 28, indie game developer in Bengaluru, vegan, obsessed with Ghibli, dry humor, building a tiny monsoon game.";
 
 const agentIcons = [User, Globe2, NotebookPen, Gamepad2, Wand2, Zap, MessageCircle];
 
-const tabs: { id: TabId; label: string; icon: typeof User }[] = [
-  { id: "website", label: "Website", icon: Globe2 },
-  { id: "life", label: "Life", icon: BookOpenText },
-  { id: "work", label: "Work", icon: Boxes },
-  { id: "trace", label: "Life Trace", icon: Layers },
+const tabs: { id: TabId; label: string; shortLabel: string; icon: typeof User }[] = [
+  { id: "website", label: "Website", shortLabel: "Site", icon: Globe2 },
+  { id: "life", label: "Life", shortLabel: "Life", icon: BookOpenText },
+  { id: "work", label: "Work", shortLabel: "Work", icon: Boxes },
+  { id: "trace", label: "Life Trace", shortLabel: "Trace", icon: Layers },
+];
+
+const outputOptions: { key: OutputKey; label: string; description: string }[] = [
+  { key: "website", label: "Website", description: "Public world page" },
+  { key: "journal", label: "Journal", description: "Recent lived time" },
+  { key: "memories", label: "Memories", description: "Emotional anchors" },
+  { key: "project", label: "Project", description: "Active work" },
+  { key: "avatar", label: "3D Avatar", description: "Body and props" },
+  { key: "chat", label: "Chat", description: "Talk to them" },
+  { key: "trace", label: "Life Trace", description: "Inspectable build" },
+];
+
+const relationshipOptions: {
+  key: RelationshipMode;
+  label: string;
+  blurb: string;
+  icon: typeof User;
+  quickPrompts: (name: string, project: string, city: string) => string[];
+}[] = [
+  {
+    key: "friend",
+    label: "Friend",
+    blurb: "Casual, emotional companion",
+    icon: Heart,
+    quickPrompts: (name, project) => [
+      `How are you feeling about ${project} today?`,
+      `What made you smile this week?`,
+      `Tell me about your favourite place`,
+      `What's stressing you out right now?`,
+    ],
+  },
+  {
+    key: "assistant",
+    label: "Personal Assistant",
+    blurb: "Plans, organises, summarises",
+    icon: NotebookPen,
+    quickPrompts: (name, project) => [
+      `Create a 3-day sprint plan for ${project}`,
+      `Summarise my journal into a weekly update`,
+      `Draft a launch note for ${project}`,
+      `What should I focus on tomorrow?`,
+    ],
+  },
+  {
+    key: "muse",
+    label: "Creative Muse",
+    blurb: "Brainstorm, write, critique",
+    icon: Lightbulb,
+    quickPrompts: (name, project, city) => [
+      `Give me 5 scene ideas set in ${city}`,
+      `Write a short vignette in your voice`,
+      `What mechanic would make ${project} unforgettable?`,
+      `Describe one world detail I haven't seen yet`,
+    ],
+  },
+  {
+    key: "npc",
+    label: "Game NPC",
+    blurb: "Lore, quests, dialogue",
+    icon: Gamepad2,
+    quickPrompts: (name) => [
+      `Write dialogue for when the player first meets you`,
+      `Give me three side-quests you'd offer`,
+      `What's the secret you'd reveal at level 5?`,
+      `Describe your room as a level`,
+    ],
+  },
+  {
+    key: "guide",
+    label: "Dream Guide",
+    blurb: "Feelings → stories, rituals, spaces",
+    icon: Compass,
+    quickPrompts: (name) => [
+      `Turn the feeling "restless" into a room`,
+      `Give me a small ritual for closing a long day`,
+      `What would a garden of my decisions look like?`,
+      `Write a tiny story about letting go`,
+    ],
+  },
+  {
+    key: "operator",
+    label: "Startup Operator",
+    blurb: "Launch plans, sprints, strategy",
+    icon: Rocket,
+    quickPrompts: (name, project) => [
+      `Draft a launch plan for ${project}`,
+      `What's the one KPI to watch this week?`,
+      `Write a crisp one-pager for investors`,
+      `Name three risks we're not taking seriously`,
+    ],
+  },
+  {
+    key: "coach",
+    label: "Coach",
+    blurb: "Reflect, plan, improve",
+    icon: Target,
+    quickPrompts: (name) => [
+      `What's one thing I avoided this week?`,
+      `Help me set one focus for tomorrow`,
+      `Reframe my last setback in two sentences`,
+      `Ask me a question I'm not asking myself`,
+    ],
+  },
+];
+
+const avatarOptions: { key: AvatarMode; label: string }[] = [
+  { key: "stylized", label: "Stylized" },
+  { key: "cinematic", label: "Cinematic" },
+  { key: "minimal", label: "Minimal" },
+];
+
+const howItWorksSteps = [
+  { label: "Describe", detail: "One paragraph" },
+  { label: "Agents build", detail: "7 Codex agents" },
+  { label: "Inhabit", detail: "Website, journal, 3D" },
+  { label: "Assign tasks", detail: "Artifacts & trace" },
 ];
 
 export default function Home() {
@@ -46,6 +182,11 @@ export default function Home() {
   const [seed, setSeed] = useState(defaultSeed);
   const [manifestSeed, setManifestSeed] = useState(defaultSeed);
   const [character, setCharacter] = useState<MayaCharacter>(arjun);
+  const [manifestOptions, setManifestOptions] = useState<ManifestOptions>({
+    outputs: ["website", "journal", "memories", "project", "avatar", "chat", "trace"],
+    relationshipMode: "friend",
+    avatarMode: "stylized",
+  });
   const [isManifesting, setIsManifesting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isTasking, setIsTasking] = useState(false);
@@ -62,6 +203,13 @@ export default function Home() {
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<number | null>(null);
 
+  const activeRelationship = useMemo(
+    () =>
+      relationshipOptions.find((r) => r.key === (character.relationshipMode || manifestOptions.relationshipMode)) ||
+      relationshipOptions[0],
+    [character.relationshipMode, manifestOptions.relationshipMode],
+  );
+
   const agents = useMemo(
     () =>
       character.lifeTrace.map((trace, index) => ({
@@ -72,19 +220,14 @@ export default function Home() {
   );
 
   const demoPrompts = useMemo(
-    () => [
-      `What is ${character.project.name}?`,
-      "What did you write in your journal?",
-      "How did MAYA build your life?",
-      `What is ${character.city} like in your world?`,
-    ],
-    [character.project.name, character.city],
+    () => activeRelationship.quickPrompts(character.name, character.project.name, character.city),
+    [activeRelationship, character.name, character.project.name, character.city],
   );
 
   const showToast = useCallback((message: string) => {
     setToast(message);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(null), 2400);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
   }, []);
 
   useEffect(() => {
@@ -111,6 +254,10 @@ export default function Home() {
     chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
   }, [messages, isSending]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
+
   async function manifestCharacter() {
     const nextSeed = seed.trim() || defaultSeed;
     setManifestSeed(nextSeed);
@@ -121,20 +268,31 @@ export default function Home() {
       const response = await fetch("/api/manifest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seed: nextSeed }),
+        body: JSON.stringify({ seed: nextSeed, options: manifestOptions }),
       });
       const data = await response.json();
-      const nextCharacter = data.character as MayaCharacter;
+      const nextCharacter: MayaCharacter = {
+        ...(data.character as MayaCharacter),
+        relationshipMode:
+          (data.character as MayaCharacter).relationshipMode || manifestOptions.relationshipMode,
+      };
       setCharacter(nextCharacter);
       setArtifacts(nextCharacter.artifacts);
+      const relationship = relationshipOptions.find((r) => r.key === nextCharacter.relationshipMode);
       setMessages([
         {
           role: "maya",
-          text: `Hey. I am ${nextCharacter.name}. MAYA just built my world, so ask me about ${nextCharacter.project.name}, my journal, or what I can make for you.`,
+          text: `Hey. I am ${nextCharacter.name}. MAYA just built my world${
+            relationship ? `, and I am set up as your ${relationship.label.toLowerCase()}` : ""
+          }. Ask me about ${nextCharacter.project.name}, my journal, or what I can make for you.`,
         },
       ]);
     } catch {
-      setCharacter(arjun);
+      const fallback: MayaCharacter = {
+        ...arjun,
+        relationshipMode: manifestOptions.relationshipMode,
+      };
+      setCharacter(fallback);
       setArtifacts(arjun.artifacts);
       setMessages([
         {
@@ -159,7 +317,11 @@ export default function Home() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: nextInput, character }),
+        body: JSON.stringify({
+          message: nextInput,
+          character,
+          relationshipMode: character.relationshipMode || manifestOptions.relationshipMode,
+        }),
       });
       const data = await response.json();
       setMessages((current) => [...current, { role: "maya", text: data.reply }]);
@@ -180,6 +342,7 @@ export default function Home() {
     if (isTasking) return;
 
     setIsTasking(true);
+    setActiveTab("work");
     try {
       const response = await fetch("/api/task", {
         method: "POST",
@@ -201,11 +364,10 @@ export default function Home() {
         { role: "you", text: task },
         {
           role: "maya",
-          text: `I made an artifact: ${artifact.title}. It is now saved in my world and recorded in Life Trace.`,
+          text: `I made an artifact: ${artifact.title}. Saved in my world and recorded in Life Trace.`,
         },
       ]);
-      setActiveTab("work");
-      showToast(`Artifact saved · ${artifact.title}`);
+      showToast(`Artifact saved · Trace updated`);
     } catch {
       setMessages((current) => [
         ...current,
@@ -249,7 +411,7 @@ export default function Home() {
         return;
       }
       await navigator.clipboard.writeText(`${text}\n${window.location.href}`);
-      showToast("Link copied to clipboard");
+      showToast("MAYA link copied");
     } catch {
       showToast("Could not share — copied to clipboard instead");
     }
@@ -263,6 +425,8 @@ export default function Home() {
         <CreateStep
           seed={seed}
           setSeed={setSeed}
+          options={manifestOptions}
+          setOptions={setManifestOptions}
           isManifesting={isManifesting}
           onManifest={manifestCharacter}
         />
@@ -274,6 +438,7 @@ export default function Home() {
           manifestSeed={manifestSeed}
           agents={agents}
           activeAgent={activeAgent}
+          relationship={activeRelationship}
         />
       )}
 
@@ -295,6 +460,7 @@ export default function Home() {
           onReset={resetToCreate}
           onExport={exportCharacter}
           onShare={shareCharacter}
+          relationship={activeRelationship}
         />
       )}
 
@@ -324,7 +490,7 @@ function TopNav({
       <button
         onClick={onHome}
         className="group flex items-center gap-3.5 rounded-2xl pr-4 text-left transition hover:bg-white/[0.035]"
-        aria-label="Go back to create"
+        aria-label="Go home"
       >
         <div className="relative grid size-10 place-items-center rounded-xl border border-[#f5a45d]/35 bg-gradient-to-br from-[#f5a45d]/20 to-[#c97b36]/10 shadow-[0_0_30px_-5px_rgba(245,164,93,0.4)]">
           <Sparkles size={16} className="text-[#f5a45d]" />
@@ -338,30 +504,20 @@ function TopNav({
           </p>
         </div>
       </button>
-      {step !== "create" && (
-        <button
-          onClick={onHome}
-          className="rounded-full border border-[#f5a45d]/25 bg-[#f5a45d]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-label text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/15 md:hidden"
-        >
-          New life
-        </button>
-      )}
-      <div className="hidden items-center gap-3 md:flex">
+      <div className="flex items-center gap-2 md:gap-3">
         {step !== "create" && (
           <button
             onClick={onHome}
-            className="rounded-full border border-[#f5a45d]/25 bg-[#f5a45d]/10 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-label text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/15"
+            className="rounded-full border border-[#f5a45d]/25 bg-[#f5a45d]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-label text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/15 md:px-3.5 md:text-[11px]"
           >
             New life
           </button>
         )}
-        <span className="inline-flex items-center gap-2 rounded-full border hairline bg-white/[0.03] px-3.5 py-1.5 text-[11px] uppercase tracking-label text-[#decaa6]">
+        <span className="chip hidden sm:inline-flex" style={{ color: "var(--paper-soft)" }}>
           <span className="live-dot" />
           {statusLabel}
         </span>
-        <span className="font-mono text-[11px] uppercase tracking-label text-[#8f7f64]">
-          Hackathon · 2025
-        </span>
+        <span className="chip hidden md:inline-flex">Hackathon · 2026</span>
       </div>
     </header>
   );
@@ -370,128 +526,170 @@ function TopNav({
 function CreateStep({
   seed,
   setSeed,
+  options,
+  setOptions,
   isManifesting,
   onManifest,
 }: {
   seed: string;
   setSeed: (v: string) => void;
+  options: ManifestOptions;
+  setOptions: React.Dispatch<React.SetStateAction<ManifestOptions>>;
   isManifesting: boolean;
   onManifest: () => void;
 }) {
   const heroRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLButtonElement>(null);
-  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  const orbAmberRef = useRef<HTMLDivElement>(null);
+  const orbMossRef = useRef<HTMLDivElement>(null);
+  const seedColumnRef = useRef<HTMLDivElement>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [useCaseIndex, setUseCaseIndex] = useState(0);
 
   useEffect(() => {
+    const id = window.setInterval(() => {
+      setUseCaseIndex((current) => (current + 1) % relationshipOptions.length);
+    }, 2400);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    let raf = 0;
+    let pending = false;
+    let latest = { x: 0, y: 0, cx: 0, cy: 0 };
+
+    function apply() {
+      pending = false;
+      const { x, y, cx, cy } = latest;
+      if (orbAmberRef.current) {
+        orbAmberRef.current.style.transform = `translate3d(${x * -30}px, ${y * -20}px, 0)`;
+      }
+      if (orbMossRef.current) {
+        orbMossRef.current.style.transform = `translate3d(${x * 22}px, ${y * 28}px, 0)`;
+      }
+      if (seedColumnRef.current) {
+        seedColumnRef.current.style.transform = `translate3d(${x * 8}px, ${y * 5}px, 0)`;
+      }
+      const btn = ctaRef.current;
+      if (btn) {
+        const br = btn.getBoundingClientRect();
+        const dist = Math.hypot(cx - (br.left + br.width / 2), cy - (br.top + br.height / 2));
+        if (dist < 160) {
+          const mx = (cx - (br.left + br.width / 2)) * 0.14;
+          const my = (cy - (br.top + br.height / 2)) * 0.14;
+          btn.style.transform = `translate3d(${mx}px, ${my}px, 0)`;
+        } else {
+          btn.style.transform = "translate3d(0, 0, 0)";
+        }
+      }
+    }
+
     function onMove(event: MouseEvent) {
       const rect = heroRef.current?.getBoundingClientRect();
       if (!rect) return;
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const nx = (event.clientX - cx) / rect.width;
-      const ny = (event.clientY - cy) / rect.height;
-      setParallax({ x: nx, y: ny });
-
-      const btn = ctaRef.current;
-      if (!btn) return;
-      const br = btn.getBoundingClientRect();
-      const dist = Math.hypot(event.clientX - (br.left + br.width / 2), event.clientY - (br.top + br.height / 2));
-      if (dist < 140) {
-        const mx = (event.clientX - (br.left + br.width / 2)) * 0.18;
-        const my = (event.clientY - (br.top + br.height / 2)) * 0.18;
-        btn.style.transform = `translate(${mx}px, ${my}px)`;
-      } else {
-        btn.style.transform = "translate(0, 0)";
+      latest = {
+        x: (event.clientX - cx) / rect.width,
+        y: (event.clientY - cy) / rect.height,
+        cx: event.clientX,
+        cy: event.clientY,
+      };
+      if (!pending) {
+        pending = true;
+        raf = requestAnimationFrame(apply);
       }
     }
     window.addEventListener("mousemove", onMove, { passive: true });
-    return () => window.removeEventListener("mousemove", onMove);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("mousemove", onMove);
+    };
   }, []);
 
-  const titleLetters = "Describe a person.".split("");
-  const titleLetters2 = "Codex builds".split("");
-  const titleLetters3 = "their world.".split("");
+  const activeRelationship = relationshipOptions.find((r) => r.key === options.relationshipMode)!;
+  const rotatingUseCase = relationshipOptions[useCaseIndex];
+
+  function toggleOutput(output: OutputKey) {
+    setOptions((current) => {
+      const hasOutput = current.outputs.includes(output);
+      if (hasOutput && current.outputs.length === 1) return current;
+      return {
+        ...current,
+        outputs: hasOutput
+          ? current.outputs.filter((item) => item !== output)
+          : [...current.outputs, output],
+      };
+    });
+  }
 
   return (
     <section
       ref={heroRef}
-      className="mx-auto grid max-w-7xl items-center gap-12 py-12 md:grid-cols-[1.1fr_0.9fr] md:py-20"
+      className="mx-auto grid max-w-7xl items-start gap-10 py-10 md:gap-14 md:py-16 lg:grid-cols-[1.05fr_0.95fr]"
     >
       <div className="relative">
         <div
-          className="orb-bokeh -left-20 -top-10 size-[26rem] animate-drift"
-          style={{
-            background: "radial-gradient(circle, rgba(245,164,93,0.42), transparent 65%)",
-            transform: `translate(${parallax.x * -30}px, ${parallax.y * -20}px)`,
-            transition: "transform 180ms ease-out",
-          }}
+          ref={orbAmberRef}
+          className="orb-bokeh -left-20 -top-10 size-[28rem] animate-drift"
+          style={{ background: "radial-gradient(circle, rgba(245,164,93,0.5), transparent 65%)" }}
         />
         <div
-          className="orb-bokeh left-[28%] top-[45%] size-64 opacity-70"
-          style={{
-            background: "radial-gradient(circle, rgba(159,176,127,0.38), transparent 65%)",
-            transform: `translate(${parallax.x * 22}px, ${parallax.y * 28}px)`,
-            transition: "transform 220ms ease-out",
-          }}
+          ref={orbMossRef}
+          className="orb-bokeh left-[26%] top-[42%] size-72 opacity-75"
+          style={{ background: "radial-gradient(circle, rgba(159,176,127,0.42), transparent 65%)" }}
         />
 
         <div className="relative animate-rise">
-          <span className="inline-flex items-center gap-2 rounded-full border hairline bg-white/[0.035] px-3.5 py-1.5 text-[11px] uppercase tracking-label text-[#decaa6] backdrop-blur">
+          <span className="chip">
             <span className="live-dot" />
-            A Codex hackathon demo
+            Codex hackathon · demo
           </span>
-          <h1 className="hero-title letter-rise mt-8 text-[clamp(3.2rem,7.5vw,6.4rem)] font-light">
-            <span className="block">
-              {titleLetters.map((ch, i) => (
-                <span key={`t1-${i}`} style={{ animationDelay: `${i * 32}ms` }}>
-                  {ch === " " ? "\u00a0" : ch}
-                </span>
-              ))}
-            </span>
-            <span className="ember-anim block italic">
-              {titleLetters2.map((ch, i) => (
-                <span
-                  key={`t2-${i}`}
-                  className="letter-rise"
-                  style={{ animationDelay: `${titleLetters.length * 32 + i * 32}ms` }}
-                >
-                  {ch === " " ? "\u00a0" : ch}
-                </span>
-              ))}
-            </span>
-            <span className="block">
-              {titleLetters3.map((ch, i) => (
-                <span
-                  key={`t3-${i}`}
-                  style={{
-                    animationDelay: `${(titleLetters.length + titleLetters2.length) * 32 + i * 32}ms`,
-                  }}
-                >
-                  {ch === " " ? "\u00a0" : ch}
-                </span>
-              ))}
-            </span>
+          <h1 className="hero-title letter-rise mt-8 text-[clamp(2.6rem,4.8vw,4.6rem)] font-light">
+            <span className="line">Describe a person.</span>
+            <span className="line ember-anim italic">Codex builds</span>
+            <span className="line">their world.</span>
           </h1>
           <p
-            className="animate-fade mt-7 max-w-xl text-[17px] leading-[1.75] text-[#c9b998]"
-            style={{ animationDelay: "0.9s" }}
+            className="animate-fade mt-8 max-w-xl text-[18px] leading-[1.7] text-[#e6d4b0]"
+            style={{ animationDelay: "0.8s" }}
           >
-            MAYA turns one paragraph into a living digital presence — website,
-            journal, memories, project, and conversation context. Seven agents
-            manifest a life you can actually talk to.
+            Describe someone. MAYA builds their world, memories, project, voice, and abilities.
           </p>
+
           <div
-            className="animate-fade mt-7 max-w-xl rounded-r-xl border-l-2 border-[#f5a45d] bg-gradient-to-r from-[#f5a45d]/[0.08] to-transparent py-3.5 pl-5 pr-4"
-            style={{ animationDelay: "1.1s" }}
+            className="animate-fade mt-5 flex max-w-xl flex-wrap items-center gap-x-3 gap-y-1 text-[15.5px] text-[#c9b998]"
+            style={{ animationDelay: "1s" }}
           >
-            <p className="font-display text-[17px] italic text-[#f7ead2]">
-              Not a chatbot. A Codex-built life. The conversation is just the
-              interface.
-            </p>
+            <span className="text-[#a39378]">Use them as a</span>
+            <span
+              key={rotatingUseCase.key}
+              className="animate-rise inline-flex items-center gap-2 font-display text-[18px] italic text-[#f5a45d]"
+            >
+              <rotatingUseCase.icon size={15} />
+              {rotatingUseCase.label.toLowerCase()}
+            </span>
+            <span className="text-[#a39378]">· {rotatingUseCase.blurb.toLowerCase()}</span>
           </div>
+
+          <ol
+            className="animate-fade mt-9 grid max-w-xl grid-cols-2 gap-2 sm:grid-cols-4"
+            style={{ animationDelay: "1.15s" }}
+          >
+            {howItWorksSteps.map((step, index) => (
+              <li key={step.label} className="glass-soft rounded-xl px-3 py-2.5">
+                <span className="font-mono text-[10px] uppercase tracking-label text-[#f5a45d]">
+                  {`0${index + 1}`}
+                </span>
+                <p className="mt-1 font-display text-[15px] text-[#f7ead2]">{step.label}</p>
+                <p className="mt-0.5 text-[11.5px] leading-snug text-[#8f7f64]">{step.detail}</p>
+              </li>
+            ))}
+          </ol>
+
           <div
             className="animate-fade mt-10 flex flex-wrap items-center gap-4"
-            style={{ animationDelay: "1.3s" }}
+            style={{ animationDelay: "1.35s" }}
           >
             <button
               ref={ctaRef}
@@ -501,10 +699,7 @@ function CreateStep({
             >
               <Sparkles size={16} />
               {isManifesting ? "Manifesting…" : "Manifest Life"}
-              <ArrowRight
-                size={16}
-                className="transition-transform group-hover:translate-x-1"
-              />
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
             </button>
             <span className="font-mono text-[11px] uppercase tracking-label text-[#8f7f64]">
               7 agents · ~5 seconds · inspectable
@@ -514,18 +709,13 @@ function CreateStep({
       </div>
 
       <div
-        className="animate-rise relative"
-        style={{
-          animationDelay: "0.3s",
-          transform: `translate(${parallax.x * 12}px, ${parallax.y * 8}px)`,
-          transition: "transform 260ms ease-out",
-        }}
+        ref={seedColumnRef}
+        className="animate-rise relative will-change-transform"
+        style={{ animationDelay: "0.3s" }}
       >
         <div
           className="orb-bokeh -right-16 top-16 size-80 opacity-60"
-          style={{
-            background: "radial-gradient(circle, rgba(245,164,93,0.38), transparent 65%)",
-          }}
+          style={{ background: "radial-gradient(circle, rgba(245,164,93,0.38), transparent 65%)" }}
         />
         <div className="glass panel-grain relative rounded-3xl p-1.5 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.7)]">
           <div className="relative rounded-[22px] bg-[#100c08]/70 p-6 md:p-7">
@@ -542,11 +732,11 @@ function CreateStep({
               onChange={(event) => setSeed(event.target.value)}
               maxLength={500}
               placeholder="Describe the person. Codex builds the rest."
-              className="scrollbar-thin mt-5 min-h-[230px] w-full resize-none bg-transparent font-display text-[22px] leading-[1.55] text-[#f7ead2] outline-none placeholder:text-[#554733]"
+              className="scrollbar-thin mt-5 min-h-[200px] w-full resize-none bg-transparent font-display text-[22px] leading-[1.55] text-[#f7ead2] outline-none placeholder:text-[#554733]"
             />
             <div className="mt-5 border-t hairline pt-5">
               <p className="mb-3 font-mono text-[11px] uppercase tracking-label text-[#a39378]">
-                Presets
+                Quick seeds
               </p>
               <div className="grid gap-2">
                 {demoSeeds.map((preset) => (
@@ -567,27 +757,156 @@ function CreateStep({
             </div>
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="glass-soft rounded-xl px-4 py-3.5">
-            <p className="font-mono text-[11px] uppercase tracking-label text-[#a39378]">
-              Output
+
+        <div className="mt-5">
+          <div className="glass-soft rounded-2xl p-5">
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-[11px] uppercase tracking-label text-[#a39378]">
+                Relationship mode
+              </p>
+              <span className="font-mono text-[10px] uppercase tracking-label text-[#9fb07f]">
+                {activeRelationship.label}
+              </span>
+            </div>
+            <p className="mt-1.5 text-[12.5px] leading-snug text-[#8f7f64]">
+              How will you use this person? MAYA tunes voice, prompts, and task output to match.
             </p>
-            <p className="mt-1.5 text-[13px] leading-[1.55] text-[#f7ead2]">
-              Website · Journal · Project · Memories · Chat
-            </p>
-          </div>
-          <div className="glass-soft rounded-xl px-4 py-3.5">
-            <p className="font-mono text-[11px] uppercase tracking-label text-[#a39378]">
-              Engine
-            </p>
-            <p className="mt-1.5 text-[13px] leading-[1.55] text-[#f7ead2]">
-              7 Codex agents · Inspectable Life Trace
-            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {relationshipOptions.map((relationship) => {
+                const Icon = relationship.icon;
+                const active = relationship.key === options.relationshipMode;
+                return (
+                  <button
+                    key={relationship.key}
+                    type="button"
+                    onClick={() =>
+                      setOptions((current) => ({ ...current, relationshipMode: relationship.key }))
+                    }
+                    className={`group/rel flex items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
+                      active
+                        ? "border-[#f5a45d]/50 bg-[#f5a45d]/[0.08] text-[#f7ead2] shadow-[0_14px_40px_-18px_rgba(245,164,93,0.55)]"
+                        : "hairline bg-white/[0.02] text-[#c9b998] hover:border-[#f5a45d]/30 hover:bg-[#f5a45d]/[0.04]"
+                    }`}
+                  >
+                    <div
+                      className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg transition ${
+                        active ? "bg-[#f5a45d]/20 text-[#f5a45d]" : "bg-white/[0.04] text-[#8f7f64]"
+                      }`}
+                    >
+                      <Icon size={14} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-display text-[14px] leading-tight">{relationship.label}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-[#8f7f64]">
+                        {relationship.blurb}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((current) => !current)}
+          className="mt-4 flex w-full items-center justify-between rounded-xl border hairline bg-white/[0.02] px-4 py-3 text-left transition hover:border-[#f5a45d]/30 hover:bg-[#f5a45d]/[0.04]"
+        >
+          <div>
+            <span className="font-mono text-[11px] uppercase tracking-label text-[#a39378]">
+              Advanced · demo controls
+            </span>
+            <p className="mt-0.5 text-[12px] text-[#8f7f64]">
+              Pick which modules MAYA builds and avatar style.
+            </p>
+          </div>
+          <ChevronDown
+            size={16}
+            className={`text-[#8f7f64] transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {showAdvanced && (
+          <div className="animate-fade mt-3 space-y-3">
+            <div className="glass-soft rounded-2xl p-5">
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[11px] uppercase tracking-label text-[#a39378]">
+                  Build modules
+                </p>
+                <span className="font-mono text-[10px] uppercase tracking-label text-[#8f7f64]">
+                  {options.outputs.length} selected
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11.5px] text-[#8f7f64]">
+                Turn modules off to keep the demo lean. Core (identity + chat) always ships.
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {outputOptions.map((item) => {
+                  const active = options.outputs.includes(item.key);
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => toggleOutput(item.key)}
+                      className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                        active
+                          ? "border-[#f5a45d]/45 bg-[#f5a45d]/10 text-[#f7ead2]"
+                          : "hairline bg-white/[0.02] text-[#8f7f64] hover:text-[#decaa6]"
+                      }`}
+                    >
+                      <span className="block font-display text-[14px] leading-tight">
+                        {item.label}
+                      </span>
+                      <span className="mt-1 block text-[10.5px] leading-snug text-[#8f7f64]">
+                        {item.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="glass-soft rounded-2xl p-5">
+              <p className="font-mono text-[11px] uppercase tracking-label text-[#a39378]">
+                Avatar style
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {avatarOptions.map((item) => {
+                  const active = item.key === options.avatarMode;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() =>
+                        setOptions((current) => ({ ...current, avatarMode: item.key }))
+                      }
+                      className={`rounded-xl border px-3 py-2.5 text-center font-display text-[14px] transition ${
+                        active
+                          ? "border-[#f5a45d]/45 bg-[#f5a45d]/10 text-[#f7ead2]"
+                          : "hairline bg-white/[0.02] text-[#8f7f64] hover:text-[#decaa6]"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
+}
+
+function extractSeedName(seed: string) {
+  const first = seed
+    .split(/[,\n]/)[0]
+    .trim()
+    .split(/\s+/)
+    .find((token) => /^[A-Za-z][A-Za-z'-]{1,}$/.test(token));
+  return first || "this life";
 }
 
 function ManifestStep({
@@ -595,6 +914,7 @@ function ManifestStep({
   manifestSeed,
   agents,
   activeAgent,
+  relationship,
 }: {
   character: MayaCharacter;
   manifestSeed: string;
@@ -606,18 +926,24 @@ function ManifestStep({
     icon: typeof User;
   }[];
   activeAgent: number;
+  relationship: (typeof relationshipOptions)[number];
 }) {
   const pct = Math.min((activeAgent / agents.length) * 100, 100);
+  const placeholderName = extractSeedName(manifestSeed);
+  const displayName =
+    activeAgent >= agents.length && character.seed === manifestSeed
+      ? character.name
+      : placeholderName;
 
   return (
     <section className="mx-auto max-w-7xl py-12">
       <div className="text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border hairline bg-white/[0.03] px-3.5 py-1.5 text-[11px] uppercase tracking-label text-[#decaa6]">
+        <span className="chip">
           <Loader2 size={12} className="animate-spin text-[#f5a45d]" />
-          Manifesting
+          Manifesting · {relationship.label}
         </span>
-        <h2 className="hero-title mt-5 text-5xl md:text-7xl">
-          Codex is building <span className="ember-anim italic">{character.name}</span>.
+        <h2 className="hero-title mt-5 text-4xl md:text-6xl">
+          Codex is building <span className="ember-anim italic">{displayName}</span>.
         </h2>
         <p className="mx-auto mt-5 max-w-2xl text-[15px] leading-[1.8] text-[#a39378]">
           {manifestSeed}
@@ -731,9 +1057,7 @@ function ManifestStep({
                       </div>
                     )}
                   </div>
-                  {complete && (
-                    <Check size={16} className="shrink-0 text-[#9fb07f]" />
-                  )}
+                  {complete && <Check size={16} className="shrink-0 text-[#9fb07f]" />}
                 </div>
               </div>
             );
@@ -761,6 +1085,7 @@ function InhabitStep({
   onReset,
   onExport,
   onShare,
+  relationship,
 }: {
   character: MayaCharacter;
   artifacts: MayaArtifact[];
@@ -778,14 +1103,28 @@ function InhabitStep({
   onReset: () => void;
   onExport: () => void;
   onShare: () => void;
+  relationship: (typeof relationshipOptions)[number];
 }) {
+  const primaryTask = character.taskSkills[0];
+  const latestTrace = character.lifeTrace.at(-1);
+
   return (
-    <section className="animate-fade mx-auto max-w-7xl space-y-6 py-6">
+    <section className="animate-fade mx-auto max-w-7xl space-y-5 py-6">
       <HeroStrip
         character={character}
         onReset={onReset}
         onExport={onExport}
         onShare={onShare}
+        relationship={relationship}
+      />
+
+      <NextBestAction
+        character={character}
+        artifacts={artifacts}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        runTask={runTask}
+        isTasking={isTasking}
       />
 
       <div className="grid gap-5 lg:grid-cols-[1.5fr_0.9fr]">
@@ -798,14 +1137,15 @@ function InhabitStep({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-medium transition ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-medium transition ${
                     active
                       ? "bg-gradient-to-br from-[#f5a45d]/20 to-[#f5a45d]/5 text-[#f7ead2] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
                       : "text-[#a39378] hover:text-[#decaa6]"
                   }`}
                 >
                   <Icon size={14} />
-                  {tab.label}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
                 </button>
               );
             })}
@@ -819,6 +1159,8 @@ function InhabitStep({
               artifacts={artifacts}
               runTask={runTask}
               isTasking={isTasking}
+              latestTrace={latestTrace}
+              onOpenTrace={() => setActiveTab("trace")}
             />
           )}
           {activeTab === "trace" && <TracePanel character={character} />}
@@ -834,11 +1176,92 @@ function InhabitStep({
             isSending={isSending}
             demoPrompts={demoPrompts}
             chatScrollRef={chatScrollRef}
+            relationship={relationship}
+            onRunTask={primaryTask ? () => runTask(primaryTask.prompt) : undefined}
+            primaryTaskLabel={primaryTask?.label}
+            isTasking={isTasking}
           />
         </aside>
       </div>
     </section>
   );
+}
+
+function NextBestAction({
+  character,
+  artifacts,
+  activeTab,
+  setActiveTab,
+  runTask,
+  isTasking,
+}: {
+  character: MayaCharacter;
+  artifacts: MayaArtifact[];
+  activeTab: TabId;
+  setActiveTab: (t: TabId) => void;
+  runTask: (task: string) => void;
+  isTasking: boolean;
+}) {
+  const primaryTask = character.taskSkills[0];
+
+  if (artifacts.length === 0 && primaryTask) {
+    return (
+      <div className="glass panel-grain animate-rise relative flex flex-col items-start gap-4 overflow-hidden rounded-2xl border-[#f5a45d]/30 bg-gradient-to-br from-[#f5a45d]/[0.1] via-[#f5a45d]/[0.04] to-transparent p-5 md:flex-row md:items-center md:gap-5 md:p-6">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#f5a45d]/20 text-[#f5a45d]">
+          <Wand2 size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[10px] uppercase tracking-label text-[#f5a45d]">
+            Next · best action
+          </p>
+          <p className="mt-1 font-display text-[18px] leading-snug text-[#f7ead2] md:text-[20px]">
+            Ask {character.name} to {primaryTask.label.toLowerCase()}.
+          </p>
+          <p className="mt-1 text-[12.5px] leading-snug text-[#a39378]">
+            Proves the product loop: talk → task → artifact → Life Trace update.
+          </p>
+        </div>
+        <button
+          onClick={() => runTask(primaryTask.prompt)}
+          disabled={isTasking}
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-gradient-to-br from-[#ffd3a0] via-[#f5a45d] to-[#c97b36] px-5 py-3 text-[13px] font-semibold text-[#0a0806] shadow-[0_14px_40px_-14px_rgba(245,164,93,0.7)] transition hover:scale-[1.02] disabled:cursor-wait disabled:opacity-70"
+        >
+          {isTasking ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          Run it
+          <ArrowRight size={13} />
+        </button>
+      </div>
+    );
+  }
+
+  if (activeTab !== "trace") {
+    return (
+      <div className="glass panel-grain animate-rise relative flex flex-col items-start gap-4 overflow-hidden rounded-2xl border-[#9fb07f]/25 bg-gradient-to-br from-[#9fb07f]/[0.1] via-[#9fb07f]/[0.03] to-transparent p-5 md:flex-row md:items-center md:gap-5 md:p-6">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#9fb07f]/20 text-[#9fb07f]">
+          <Layers size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[10px] uppercase tracking-label text-[#9fb07f]">
+            Trace · updated
+          </p>
+          <p className="mt-1 font-display text-[17px] leading-snug text-[#f7ead2] md:text-[19px]">
+            See how MAYA made the latest artifact.
+          </p>
+          <p className="mt-1 text-[12.5px] leading-snug text-[#a39378]">
+            {artifacts.length} saved · {character.lifeTrace.length} trace events
+          </p>
+        </div>
+        <button
+          onClick={() => setActiveTab("trace")}
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[#9fb07f]/40 bg-[#9fb07f]/10 px-5 py-3 text-[13px] font-semibold text-[#c9d6ae] transition hover:border-[#9fb07f]/70 hover:bg-[#9fb07f]/15"
+        >
+          Open Life Trace <ArrowRight size={13} />
+        </button>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function useTypewriter(target: string, speed = 45) {
@@ -861,23 +1284,26 @@ function HeroStrip({
   onReset,
   onExport,
   onShare,
+  relationship,
 }: {
   character: MayaCharacter;
   onReset: () => void;
   onExport: () => void;
   onShare: () => void;
+  relationship: (typeof relationshipOptions)[number];
 }) {
   const typedName = useTypewriter(character.name, 62);
+  const RelIcon = relationship.icon;
   return (
     <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
       <div className="glass panel-grain relative overflow-hidden rounded-3xl">
         <AvatarStage character={character} size="hero" />
-        <div className="pointer-events-none absolute left-5 right-5 top-5 z-10 flex flex-col gap-1.5">
+        <div className="pointer-events-none absolute left-5 right-5 top-5 z-10 flex flex-wrap gap-1.5">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#9fb07f]/30 bg-[#9fb07f]/15 px-3 py-1 text-[10px] uppercase tracking-label text-[#c9d6ae] backdrop-blur">
             <span className="live-dot" />
-            Avatar Agent · compiled
+            Avatar · compiled
           </span>
-          <span className="inline-flex w-fit max-w-full items-center gap-2 rounded-full border hairline bg-black/40 px-3 py-1 font-mono text-[10px] uppercase tracking-label text-[#decaa6] backdrop-blur">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border hairline bg-black/40 px-3 py-1 font-mono text-[10px] uppercase tracking-label text-[#decaa6] backdrop-blur">
             {character.avatar.traits.slice(0, 3).join(" · ")}
           </span>
         </div>
@@ -909,6 +1335,10 @@ function HeroStrip({
             {character.role}
             {character.age ? ` · ${character.age}` : ""} · {character.city}
           </p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#f5a45d]/30 bg-[#f5a45d]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-label text-[#f5a45d]">
+            <RelIcon size={11} />
+            Mode · {relationship.label}
+          </div>
           <p className="mt-6 max-w-xl text-[16px] leading-[1.75] text-[#f7ead2]">
             {character.essence}
           </p>
@@ -941,7 +1371,7 @@ function HeroStrip({
               onClick={onShare}
               className="inline-flex items-center gap-2 rounded-xl border hairline bg-white/[0.03] px-3.5 py-2 text-[12px] text-[#decaa6] transition hover:border-[#f5a45d]/40 hover:bg-[#f5a45d]/[0.06] hover:text-[#f7ead2]"
             >
-              <Share2 size={12} /> Share mini-site
+              <Share2 size={12} /> Share MAYA link
             </button>
           </div>
         </div>
@@ -980,9 +1410,7 @@ function WebsitePanel({ character }: { character: MayaCharacter }) {
               className="rounded-2xl border border-[#d3bd91] bg-[#f3e2bf]/60 p-5 backdrop-blur"
             >
               <h3 className="font-display text-[20px]">{section.title}</h3>
-              <p className="mt-3 text-[13px] leading-[1.7] text-[#4f3b25]">
-                {section.body}
-              </p>
+              <p className="mt-3 text-[13px] leading-[1.7] text-[#4f3b25]">{section.body}</p>
             </article>
           ))}
         </div>
@@ -1007,12 +1435,8 @@ function LifePanel({ character }: { character: MayaCharacter }) {
               </span>
               <BookOpenText size={13} className="text-[#8f7f64]" />
             </div>
-            <h3 className="mt-3 font-display text-[22px] leading-tight">
-              {entry.title}
-            </h3>
-            <p className="mt-3 text-[14px] leading-[1.75] text-[#c9b998]">
-              {entry.body}
-            </p>
+            <h3 className="mt-3 font-display text-[22px] leading-tight">{entry.title}</h3>
+            <p className="mt-3 text-[14px] leading-[1.75] text-[#c9b998]">{entry.body}</p>
           </article>
         ))}
       </SectionPanel>
@@ -1025,9 +1449,7 @@ function LifePanel({ character }: { character: MayaCharacter }) {
             style={{ animationDelay: `${i * 80 + 120}ms` }}
           >
             <h3 className="font-display text-[18px]">{memory.title}</h3>
-            <p className="mt-2.5 text-[13px] leading-[1.7] text-[#c9b998]">
-              {memory.caption}
-            </p>
+            <p className="mt-2.5 text-[13px] leading-[1.7] text-[#c9b998]">{memory.caption}</p>
           </article>
         ))}
       </SectionPanel>
@@ -1040,11 +1462,15 @@ function WorkPanel({
   artifacts,
   runTask,
   isTasking,
+  latestTrace,
+  onOpenTrace,
 }: {
   character: MayaCharacter;
   artifacts: MayaArtifact[];
   runTask: (task: string) => void;
   isTasking: boolean;
+  latestTrace?: MayaCharacter["lifeTrace"][number];
+  onOpenTrace: () => void;
 }) {
   return (
     <div className="space-y-5">
@@ -1059,9 +1485,7 @@ function WorkPanel({
               {character.project.status.includes("Prototype") ? "prototype" : "concept"}
             </span>
           </div>
-          <h2 className="hero-title mt-4 text-4xl md:text-5xl">
-            {character.project.name}
-          </h2>
+          <h2 className="hero-title mt-4 text-4xl md:text-5xl">{character.project.name}</h2>
           <p className="mt-4 max-w-2xl text-[15px] leading-[1.8] text-[#c9b998]">
             {character.project.description}
           </p>
@@ -1108,9 +1532,7 @@ function WorkPanel({
                 {skill.outputType}
               </span>
               <h3 className="mt-2 font-display text-[18px]">{skill.label}</h3>
-              <p className="mt-2 text-[12.5px] leading-[1.65] text-[#c9b998]">
-                {skill.prompt}
-              </p>
+              <p className="mt-2 text-[12.5px] leading-[1.65] text-[#c9b998]">{skill.prompt}</p>
               <div className="mt-4 flex items-center gap-1.5 text-[11px] uppercase tracking-label text-[#f5a45d] opacity-0 transition group-hover/task:opacity-100">
                 {isTasking ? (
                   <>
@@ -1126,6 +1548,25 @@ function WorkPanel({
           ))}
         </div>
       </SectionPanel>
+
+      {latestTrace && artifacts.length > 0 && (
+        <button
+          onClick={onOpenTrace}
+          className="flex w-full items-start gap-4 rounded-2xl border border-[#9fb07f]/25 bg-[#9fb07f]/[0.06] p-4 text-left transition hover:border-[#9fb07f]/50 hover:bg-[#9fb07f]/[0.1]"
+        >
+          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#9fb07f]/20 text-[#9fb07f]">
+            <Layers size={14} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10px] uppercase tracking-label text-[#9fb07f]">
+              Latest trace event
+            </p>
+            <p className="mt-1 font-display text-[15px] text-[#f7ead2]">{latestTrace.agent}</p>
+            <p className="mt-0.5 truncate text-[12px] text-[#a39378]">{latestTrace.artifact}</p>
+          </div>
+          <ArrowRight size={14} className="mt-1.5 shrink-0 text-[#9fb07f]" />
+        </button>
+      )}
 
       <SectionPanel title="Artifacts" badge={`${artifacts.length} saved`}>
         {artifacts.length === 0 ? (
@@ -1155,9 +1596,7 @@ function WorkPanel({
                     {artifact.createdBy}
                   </span>
                 </div>
-                <h3 className="mt-3 font-display text-[19px] leading-snug">
-                  {artifact.title}
-                </h3>
+                <h3 className="mt-3 font-display text-[19px] leading-snug">{artifact.title}</h3>
                 <div className="mt-3 space-y-2 text-[13px] leading-[1.7] text-[#c9b998]">
                   {artifact.content.map((line) => (
                     <p key={line}>{line}</p>
@@ -1188,7 +1627,7 @@ function TracePanel({ character }: { character: MayaCharacter }) {
       <div className="relative space-y-3">
         <div className="absolute bottom-3 left-[22px] top-3 w-px bg-gradient-to-b from-[#f5a45d]/40 via-[#9fb07f]/30 to-transparent" />
         {character.lifeTrace.map((trace, index) => {
-          const Icon = agentIcons[index] ?? Code2;
+          const Icon = agentIcons[index % agentIcons.length] ?? Code2;
           return (
             <div
               key={`${trace.agent}-${index}`}
@@ -1205,12 +1644,8 @@ function TracePanel({ character }: { character: MayaCharacter }) {
                     {trace.status}
                   </span>
                 </div>
-                <p className="mt-2 text-[13.5px] leading-[1.7] text-[#f7ead2]">
-                  {trace.artifact}
-                </p>
-                <p className="mt-2 text-[12.5px] leading-[1.7] text-[#a39378]">
-                  {trace.detail}
-                </p>
+                <p className="mt-2 text-[13.5px] leading-[1.7] text-[#f7ead2]">{trace.artifact}</p>
+                <p className="mt-2 text-[12.5px] leading-[1.7] text-[#a39378]">{trace.detail}</p>
               </div>
             </div>
           );
@@ -1229,6 +1664,10 @@ function ChatPanel({
   isSending,
   demoPrompts,
   chatScrollRef,
+  relationship,
+  onRunTask,
+  primaryTaskLabel,
+  isTasking,
 }: {
   character: MayaCharacter;
   messages: Message[];
@@ -1238,9 +1677,14 @@ function ChatPanel({
   isSending: boolean;
   demoPrompts: string[];
   chatScrollRef: React.RefObject<HTMLDivElement | null>;
+  relationship: (typeof relationshipOptions)[number];
+  onRunTask?: () => void;
+  primaryTaskLabel?: string;
+  isTasking: boolean;
 }) {
+  const RelIcon = relationship.icon;
   return (
-    <div className="glass panel-grain flex min-h-[680px] flex-col rounded-3xl p-5">
+    <div className="glass panel-grain mobile-chat flex min-h-[620px] flex-col rounded-3xl p-5 lg:min-h-[680px]">
       <div className="flex items-center gap-3 border-b hairline pb-4">
         <div className="relative">
           <div className="grid size-12 place-items-center rounded-xl bg-gradient-to-br from-[#f5a45d]/25 to-[#9fb07f]/15">
@@ -1249,25 +1693,36 @@ function ChatPanel({
           <span className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-[#0a0806] bg-[#9fb07f]" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[20px] leading-tight">
-            Talk to {character.name}
-          </h2>
-          <p className="truncate font-mono text-[10.5px] uppercase tracking-label text-[#9fb07f]">
-            Grounded · journal · project · {character.city}
+          <h2 className="font-display text-[20px] leading-tight">Talk to {character.name}</h2>
+          <p className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-[10.5px] uppercase tracking-label text-[#9fb07f]">
+            <RelIcon size={10} /> {relationship.label}
           </p>
         </div>
       </div>
 
       <div className="mt-4 grid gap-2">
-        <p className="font-mono text-[10px] uppercase tracking-label text-[#a39378]">
-          Ask something
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-[10px] uppercase tracking-label text-[#a39378]">
+            Ask something
+          </p>
+          {onRunTask && primaryTaskLabel && (
+            <button
+              onClick={onRunTask}
+              disabled={isTasking}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#f5a45d]/35 bg-[#f5a45d]/[0.08] px-2.5 py-1 font-mono text-[10px] uppercase tracking-label text-[#f5a45d] transition hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/[0.12] disabled:opacity-60"
+            >
+              {isTasking ? <Loader2 size={10} className="animate-spin" /> : <Wand2 size={10} />}
+              Quick task
+            </button>
+          )}
+        </div>
         <div className="grid gap-1.5">
           {demoPrompts.map((prompt) => (
             <button
               key={prompt}
               onClick={() => sendMessage(prompt)}
-              className="truncate rounded-xl border hairline bg-white/[0.025] px-3.5 py-2.5 text-left text-[12.5px] text-[#c9b998] transition hover:border-[#f5a45d]/40 hover:bg-[#f5a45d]/[0.05] hover:text-[#f7ead2]"
+              title={prompt}
+              className="rounded-xl border hairline bg-white/[0.025] px-3.5 py-2.5 text-left text-[12.5px] leading-snug text-[#c9b998] transition hover:border-[#f5a45d]/40 hover:bg-[#f5a45d]/[0.05] hover:text-[#f7ead2]"
             >
               {prompt}
             </button>
@@ -1340,9 +1795,7 @@ function SectionPanel({
   return (
     <section className="glass panel-grain relative rounded-3xl p-6">
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="font-mono text-[11px] uppercase tracking-label text-[#decaa6]">
-          {title}
-        </h2>
+        <h2 className="font-mono text-[11px] uppercase tracking-label text-[#decaa6]">{title}</h2>
         {badge && (
           <span className="font-mono text-[10px] uppercase tracking-label text-[#8f7f64]">
             {badge}

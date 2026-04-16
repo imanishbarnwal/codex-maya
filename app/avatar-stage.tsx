@@ -49,11 +49,11 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
 
     const scene = new THREE.Scene();
 
-    const camera = new THREE.PerspectiveCamera(size === "hero" ? 30 : 34, 1, 0.1, 100);
-    const camRadius = size === "hero" ? 9.8 : size === "compact" ? 8.2 : 8.6;
-    const camHeight = size === "hero" ? 0.45 : 0.35;
+    const camera = new THREE.PerspectiveCamera(size === "hero" ? 32 : 34, 1, 0.1, 100);
+    const camRadius = size === "hero" ? 8.8 : size === "compact" ? 8.0 : 8.4;
+    const camHeight = size === "hero" ? 0.2 : 0.25;
     camera.position.set(0, camHeight, camRadius);
-    camera.lookAt(0, -0.12, 0);
+    camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -109,8 +109,8 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     });
 
     const figure = new THREE.Group();
-    figure.position.y = size === "hero" ? -0.05 : 0.02;
-    figure.scale.setScalar(size === "hero" ? 0.9 : size === "compact" ? 0.86 : 0.92);
+    figure.position.y = size === "hero" ? -0.02 : 0.02;
+    figure.scale.setScalar(size === "hero" ? 0.95 : size === "compact" ? 0.86 : 0.96);
     scene.add(figure);
 
     const head = new THREE.Group();
@@ -452,22 +452,26 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     }
 
     const bokehGroup = new THREE.Group();
-    for (let i = 0; i < 8; i += 1) {
+    const bokehLayout = [
+      { x: -3.2, y: 1.6, z: -3 },
+      { x: 3.2, y: 1.8, z: -3 },
+      { x: -2.4, y: -0.2, z: -3.4 },
+      { x: 2.4, y: -0.3, z: -3.4 },
+      { x: 0, y: 2.4, z: -3.6 },
+      { x: 0, y: -1.0, z: -3.6 },
+    ];
+    bokehLayout.forEach((p, i) => {
       const bokeh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.16 + Math.random() * 0.1, 12, 10),
+        new THREE.SphereGeometry(0.18, 12, 10),
         new THREE.MeshBasicMaterial({
           color: i % 2 === 0 ? accent : primary,
           transparent: true,
           opacity: 0.22,
         }),
       );
-      bokeh.position.set(
-        (Math.random() - 0.5) * 8,
-        Math.random() * 3 - 0.5,
-        -2.5 - Math.random() * 2,
-      );
+      bokeh.position.set(p.x, p.y, p.z);
       bokehGroup.add(bokeh);
-    }
+    });
     scene.add(bokehGroup);
 
     const hemi = new THREE.HemisphereLight(light, shadeHSL(dark, 0.02), 1.15);
@@ -497,7 +501,11 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     function resize() {
       const { width, height } = container.getBoundingClientRect();
       const safeH = Math.max(height, 320);
-      renderer.setSize(width, safeH, false);
+      renderer.setSize(width, safeH, true);
+      const canvas = renderer.domElement;
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+      canvas.style.display = "block";
       camera.aspect = width / safeH;
       camera.updateProjectionMatrix();
     }
@@ -514,11 +522,11 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     function animate() {
       t += 0.012;
 
-      figure.rotation.y = Math.sin(t * 0.3) * 0.1;
-      figure.position.y = 0.05 + Math.sin(t * 1.4) * 0.022;
+      figure.rotation.y = 0;
+      figure.position.y = (size === "hero" ? -0.02 : 0.02) + Math.sin(t * 1.4) * 0.018;
 
-      const targetY = mouseRef.current.x * 0.45 + Math.sin(t * 0.4) * 0.04;
-      const targetX = mouseRef.current.y * 0.18 + Math.sin(t * 0.6) * 0.015;
+      const targetY = mouseRef.current.x * 0.28 + Math.sin(t * 0.4) * 0.03;
+      const targetX = mouseRef.current.y * 0.12 + Math.sin(t * 0.6) * 0.012;
       currentHeadRotY += (targetY - currentHeadRotY) * 0.08;
       currentHeadRotX += (targetX - currentHeadRotX) * 0.08;
       head.rotation.y = currentHeadRotY;
@@ -555,11 +563,10 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
         if (rain.position.y < -1.5) rain.position.y = 0;
       }
 
-      const camAngle = Math.sin(t * 0.2) * 0.08 + mouseRef.current.x * 0.035;
-      camera.position.x = Math.sin(camAngle) * camRadius;
-      camera.position.z = Math.cos(camAngle) * camRadius;
-      camera.position.y = camHeight + Math.sin(t * 0.3) * 0.025 - mouseRef.current.y * 0.045;
-      camera.lookAt(0, -0.12, 0);
+      camera.position.x = 0;
+      camera.position.z = camRadius;
+      camera.position.y = camHeight + Math.sin(t * 0.35) * 0.02;
+      camera.lookAt(0, 0, 0);
 
       renderer.render(scene, camera);
       raf = requestAnimationFrame(animate);
@@ -598,7 +605,7 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     size === "compact"
       ? "h-[300px] w-full"
       : size === "hero"
-        ? "h-[420px] w-full md:h-[520px] xl:h-[560px]"
+        ? "h-[390px] w-full md:h-[500px] xl:h-[520px]"
         : "h-[460px] w-full md:h-[540px]";
 
   return (
@@ -607,12 +614,12 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 70% 60% at 50% 55%, rgba(245,164,93,0.22) 0%, transparent 60%), radial-gradient(ellipse 50% 50% at 30% 30%, rgba(159,176,127,0.12) 0%, transparent 70%)",
+            "radial-gradient(ellipse 80% 65% at 50% 55%, rgba(245,164,93,0.24) 0%, transparent 65%), radial-gradient(ellipse 35% 30% at 50% 18%, rgba(159,176,127,0.1) 0%, transparent 70%)",
         }}
       />
       <div ref={mountRef} className={`relative ${heightClass}`} data-avatar-canvas />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0a0806] via-[#0a0806]/60 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#0a0806]/30 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0a0806]/80 via-[#0a0806]/30 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-[#0a0806]/30 to-transparent" />
     </div>
   );
 }
