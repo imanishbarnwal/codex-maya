@@ -17,18 +17,23 @@ import {
   Lightbulb,
   Loader2,
   MessageCircle,
+  Mic,
+  MicOff,
   NotebookPen,
   RefreshCw,
   Rocket,
   Send,
   Share2,
   Sparkles,
+  Square,
   Target,
   User,
+  Volume2,
+  VolumeX,
   Wand2,
   Zap,
 } from "lucide-react";
-import { AvatarStage } from "@/app/avatar-stage";
+import { AvatarStage, type AvatarMode } from "@/app/avatar-stage";
 import {
   arjun,
   demoSeeds,
@@ -36,11 +41,16 @@ import {
   type MayaCharacter,
   type RelationshipMode,
 } from "@/lib/maya-data";
+import {
+  pickVoice,
+  useSpeechRecognition,
+  useSpeechSynthesis,
+  type VoicePreference,
+} from "@/lib/voice";
 
 type Message = { role: "maya" | "you"; text: string };
 type TabId = "website" | "life" | "work" | "trace";
 type OutputKey = "website" | "journal" | "memories" | "project" | "avatar" | "chat" | "trace";
-type AvatarMode = "stylized" | "cinematic" | "minimal";
 
 type ManifestOptions = {
   outputs: OutputKey[];
@@ -200,8 +210,32 @@ export default function Home() {
   ]);
   const [input, setInput] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [voicePref, setVoicePref] = useState<VoicePreference>("off");
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<number | null>(null);
+  const spokenRef = useRef<string | null>(null);
+  const mountedRef = useRef(false);
+  const { voices, speaking, speak, cancel: cancelSpeak } = useSpeechSynthesis();
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("maya-voice-pref");
+      if (saved === "female" || saved === "male" || saved === "off") {
+        setVoicePref(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("maya-voice-pref", voicePref);
+    } catch {
+      // ignore
+    }
+    if (voicePref === "off") cancelSpeak();
+  }, [voicePref, cancelSpeak]);
 
   const activeRelationship = useMemo(
     () =>
@@ -257,6 +291,29 @@ export default function Home() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
+
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!mountedRef.current) {
+      spokenRef.current = last?.text ?? null;
+      mountedRef.current = true;
+      return;
+    }
+    if (voicePref === "off") return;
+    if (!last || last.role !== "maya") return;
+    if (spokenRef.current === last.text) return;
+    spokenRef.current = last.text;
+    const voice = pickVoice(voices, voicePref);
+    speak(last.text, voice);
+  }, [messages, voicePref, voices, speak]);
+
+  const speakText = useCallback(
+    (text: string) => {
+      const voice = pickVoice(voices, voicePref === "off" ? "female" : voicePref);
+      speak(text, voice);
+    },
+    [voices, voicePref, speak],
+  );
 
   async function manifestCharacter() {
     const nextSeed = seed.trim() || defaultSeed;
@@ -432,6 +489,8 @@ export default function Home() {
         />
       )}
 
+
+
       {step === "manifest" && (
         <ManifestStep
           character={character}
@@ -461,6 +520,13 @@ export default function Home() {
           onExport={exportCharacter}
           onShare={shareCharacter}
           relationship={activeRelationship}
+          avatarMode={manifestOptions.avatarMode}
+          outputs={manifestOptions.outputs}
+          voicePref={voicePref}
+          setVoicePref={setVoicePref}
+          speaking={speaking}
+          cancelSpeak={cancelSpeak}
+          speakText={speakText}
         />
       )}
 
@@ -545,6 +611,20 @@ function CreateStep({
   const seedColumnRef = useRef<HTMLDivElement>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [useCaseIndex, setUseCaseIndex] = useState(0);
+
+  const {
+    supported: micSupported,
+    listening: seedListening,
+    start: seedStart,
+    stop: seedStop,
+  } = useSpeechRecognition({
+    onResult: (text) => {
+      const clean = text.trim();
+      if (!clean) return;
+      const next = seed.trim() ? `${seed.trim()} ${clean}` : clean;
+      setSeed(next.slice(0, 500));
+    },
+  });
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -723,15 +803,39 @@ function CreateStep({
               <span className="font-mono text-[11px] uppercase tracking-label text-[#a39378]">
                 Character Seed
               </span>
-              <span className="font-mono text-[11px] text-[#8f7f64]">
-                {seed.length} / 500
-              </span>
+              <div className="flex items-center gap-2">
+                {micSupported && (
+                  <button
+                    type="button"
+                    onClick={seedListening ? seedStop : seedStart}
+                    aria-label={seedListening ? "Stop recording" : "Speak your seed"}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-label transition ${
+                      seedListening
+                        ? "border-[#f5a45d]/60 bg-[#f5a45d]/15 text-[#f5a45d] shadow-[0_0_18px_0_rgba(245,164,93,0.4)]"
+                        : "hairline bg-white/[0.04] text-[#c9b998] hover:border-[#f5a45d]/40 hover:text-[#f5a45d]"
+                    }`}
+                  >
+                    {seedListening ? (
+                      <>
+                        <Square size={9} fill="currentColor" /> Listening
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={10} /> Speak seed
+                      </>
+                    )}
+                  </button>
+                )}
+                <span className="font-mono text-[11px] text-[#8f7f64]">{seed.length} / 500</span>
+              </div>
             </div>
             <textarea
               value={seed}
               onChange={(event) => setSeed(event.target.value)}
               maxLength={500}
-              placeholder="Describe the person. Codex builds the rest."
+              placeholder={
+                seedListening ? "Listening…" : "Describe the person. Codex builds the rest."
+              }
               className="scrollbar-thin mt-5 min-h-[200px] w-full resize-none bg-transparent font-display text-[22px] leading-[1.55] text-[#f7ead2] outline-none placeholder:text-[#554733]"
             />
             <div className="mt-5 border-t hairline pt-5">
@@ -1086,6 +1190,13 @@ function InhabitStep({
   onExport,
   onShare,
   relationship,
+  avatarMode,
+  outputs,
+  voicePref,
+  setVoicePref,
+  speaking,
+  cancelSpeak,
+  speakText,
 }: {
   character: MayaCharacter;
   artifacts: MayaArtifact[];
@@ -1104,9 +1215,30 @@ function InhabitStep({
   onExport: () => void;
   onShare: () => void;
   relationship: (typeof relationshipOptions)[number];
+  avatarMode: AvatarMode;
+  outputs: OutputKey[];
+  voicePref: VoicePreference;
+  setVoicePref: (pref: VoicePreference) => void;
+  speaking: boolean;
+  cancelSpeak: () => void;
+  speakText: (text: string) => void;
 }) {
   const primaryTask = character.taskSkills[0];
   const latestTrace = character.lifeTrace.at(-1);
+
+  const tabEnabled: Record<TabId, boolean> = {
+    website: outputs.includes("website"),
+    life: outputs.includes("journal") || outputs.includes("memories"),
+    work: outputs.includes("project"),
+    trace: outputs.includes("trace"),
+  };
+  const visibleTabs = tabs.filter((tab) => tabEnabled[tab.id]);
+
+  useEffect(() => {
+    if (!tabEnabled[activeTab] && visibleTabs[0]) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [activeTab, tabEnabled, visibleTabs, setActiveTab]);
 
   return (
     <section className="animate-fade mx-auto max-w-7xl space-y-5 py-6">
@@ -1116,6 +1248,7 @@ function InhabitStep({
         onExport={onExport}
         onShare={onShare}
         relationship={relationship}
+        avatarMode={avatarMode}
       />
 
       <NextBestAction
@@ -1130,7 +1263,7 @@ function InhabitStep({
       <div className="grid gap-5 lg:grid-cols-[1.5fr_0.9fr]">
         <div className="space-y-5">
           <div className="glass panel-grain flex items-center gap-1.5 rounded-2xl p-1.5">
-            {tabs.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const active = tab.id === activeTab;
               return (
@@ -1180,6 +1313,11 @@ function InhabitStep({
             onRunTask={primaryTask ? () => runTask(primaryTask.prompt) : undefined}
             primaryTaskLabel={primaryTask?.label}
             isTasking={isTasking}
+            voicePref={voicePref}
+            setVoicePref={setVoicePref}
+            speaking={speaking}
+            cancelSpeak={cancelSpeak}
+            speakText={speakText}
           />
         </aside>
       </div>
@@ -1285,19 +1423,43 @@ function HeroStrip({
   onExport,
   onShare,
   relationship,
+  avatarMode,
 }: {
   character: MayaCharacter;
   onReset: () => void;
   onExport: () => void;
   onShare: () => void;
   relationship: (typeof relationshipOptions)[number];
+  avatarMode: AvatarMode;
 }) {
   const typedName = useTypewriter(character.name, 62);
   const RelIcon = relationship.icon;
   return (
     <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
       <div className="glass panel-grain relative overflow-hidden rounded-3xl">
-        <AvatarStage character={character} size="hero" />
+        <AvatarStage
+          character={character}
+          size="hero"
+          avatarMode={avatarMode}
+          relationshipMode={relationship.key}
+        />
+        <div className="pointer-events-none absolute bottom-5 right-5 z-10">
+          <div className="glass flex items-center gap-3 rounded-2xl px-3 py-2 backdrop-blur">
+            <div className="relative size-11 overflow-hidden rounded-xl border border-[#f5a45d]/35 bg-[#0a0806]">
+              <img
+                src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(character.slug)}&backgroundColor=1f1812,27221b`}
+                alt={`${character.name} portrait`}
+                className="size-full object-cover"
+              />
+            </div>
+            <div className="leading-tight">
+              <p className="font-display text-[13px] text-[#f7ead2]">{character.name}</p>
+              <p className="font-mono text-[9px] uppercase tracking-label text-[#8f7f64]">
+                portrait · dicebear
+              </p>
+            </div>
+          </div>
+        </div>
         <div className="pointer-events-none absolute left-5 right-5 top-5 z-10 flex flex-wrap gap-1.5">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#9fb07f]/30 bg-[#9fb07f]/15 px-3 py-1 text-[10px] uppercase tracking-label text-[#c9d6ae] backdrop-blur">
             <span className="live-dot" />
@@ -1624,8 +1786,7 @@ function WorkPanel({
 function TracePanel({ character }: { character: MayaCharacter }) {
   return (
     <SectionPanel title="Life Trace" badge="inspectable">
-      <div className="relative space-y-3">
-        <div className="absolute bottom-3 left-[22px] top-3 w-px bg-gradient-to-b from-[#f5a45d]/40 via-[#9fb07f]/30 to-transparent" />
+      <div className="space-y-3">
         {character.lifeTrace.map((trace, index) => {
           const Icon = agentIcons[index % agentIcons.length] ?? Code2;
           return (
@@ -1668,6 +1829,11 @@ function ChatPanel({
   onRunTask,
   primaryTaskLabel,
   isTasking,
+  voicePref,
+  setVoicePref,
+  speaking,
+  cancelSpeak,
+  speakText,
 }: {
   character: MayaCharacter;
   messages: Message[];
@@ -1681,8 +1847,25 @@ function ChatPanel({
   onRunTask?: () => void;
   primaryTaskLabel?: string;
   isTasking: boolean;
+  voicePref: VoicePreference;
+  setVoicePref: (pref: VoicePreference) => void;
+  speaking: boolean;
+  cancelSpeak: () => void;
+  speakText: (text: string) => void;
 }) {
   const RelIcon = relationship.icon;
+  const {
+    supported: micSupported,
+    listening,
+    start: startListening,
+    stop: stopListening,
+  } = useSpeechRecognition({
+    onResult: (text) => {
+      setInput(text);
+      sendMessage(text);
+    },
+  });
+
   return (
     <div className="glass panel-grain mobile-chat flex min-h-[620px] flex-col rounded-3xl p-5 lg:min-h-[680px]">
       <div className="flex items-center gap-3 border-b hairline pb-4">
@@ -1698,6 +1881,12 @@ function ChatPanel({
             <RelIcon size={10} /> {relationship.label}
           </p>
         </div>
+        <VoiceToggle
+          voicePref={voicePref}
+          setVoicePref={setVoicePref}
+          speaking={speaking}
+          cancelSpeak={cancelSpeak}
+        />
       </div>
 
       <div className="mt-4 grid gap-2">
@@ -1737,16 +1926,25 @@ function ChatPanel({
         {messages.map((message, index) => (
           <div
             key={`${message.role}-${index}`}
-            className={`flex ${message.role === "you" ? "justify-end" : "justify-start"}`}
+            className={`group/msg flex ${message.role === "you" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-[1.65] ${
+              className={`relative max-w-[85%] rounded-2xl px-4 py-2.5 text-[13.5px] leading-[1.65] ${
                 message.role === "you"
                   ? "rounded-br-sm bg-gradient-to-br from-[#f5a45d] to-[#c97b36] text-[#0a0806]"
                   : "rounded-bl-sm border hairline bg-white/[0.04] text-[#f7ead2]"
               }`}
             >
               {message.text}
+              {message.role === "maya" && (
+                <button
+                  onClick={() => speakText(message.text)}
+                  aria-label="Play voice"
+                  className="absolute -right-1 -top-1 grid size-6 place-items-center rounded-full border border-[#f5a45d]/30 bg-[#0a0806] text-[#f5a45d] opacity-0 transition group-hover/msg:opacity-100 hover:border-[#f5a45d]/60 hover:bg-[#f5a45d]/10"
+                >
+                  <Volume2 size={11} />
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -1768,9 +1966,22 @@ function ChatPanel({
           onKeyDown={(event) => {
             if (event.key === "Enter") sendMessage();
           }}
-          placeholder={`Ask ${character.name} about ${character.project.name}…`}
+          placeholder={listening ? "Listening…" : `Ask ${character.name} about ${character.project.name}…`}
           className="min-w-0 flex-1 bg-transparent text-[14px] text-[#f7ead2] outline-none placeholder:text-[#6b5c45]"
         />
+        {micSupported && (
+          <button
+            onClick={listening ? stopListening : startListening}
+            aria-label={listening ? "Stop listening" : "Speak your message"}
+            className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg border transition ${
+              listening
+                ? "border-[#f5a45d]/60 bg-[#f5a45d]/20 text-[#f5a45d] shadow-[0_0_18px_0_rgba(245,164,93,0.35)]"
+                : "hairline bg-white/[0.04] text-[#c9b998] hover:border-[#f5a45d]/40 hover:text-[#f5a45d]"
+            }`}
+          >
+            {listening ? <Square size={12} fill="currentColor" /> : <Mic size={14} />}
+          </button>
+        )}
         <button
           onClick={() => sendMessage()}
           disabled={isSending || !input.trim()}
@@ -1778,6 +1989,59 @@ function ChatPanel({
         >
           {isSending ? <Loader2 size={15} className="animate-spin" /> : <Send size={14} />}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function VoiceToggle({
+  voicePref,
+  setVoicePref,
+  speaking,
+  cancelSpeak,
+}: {
+  voicePref: VoicePreference;
+  setVoicePref: (pref: VoicePreference) => void;
+  speaking: boolean;
+  cancelSpeak: () => void;
+}) {
+  const options: { key: VoicePreference; label: string; title: string }[] = [
+    { key: "off", label: "Off", title: "Voice off" },
+    { key: "female", label: "F", title: "Female voice" },
+    { key: "male", label: "M", title: "Male voice" },
+  ];
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {speaking && (
+        <button
+          onClick={cancelSpeak}
+          aria-label="Stop voice"
+          className="grid size-7 place-items-center rounded-full border border-[#f5a45d]/40 bg-[#f5a45d]/15 text-[#f5a45d]"
+        >
+          <VolumeX size={12} />
+        </button>
+      )}
+      <div className="flex items-center rounded-full border hairline bg-white/[0.04] p-0.5">
+        {options.map((option) => {
+          const active = option.key === voicePref;
+          return (
+            <button
+              key={option.key}
+              onClick={() => setVoicePref(option.key)}
+              title={option.title}
+              aria-label={option.title}
+              className={`grid h-6 min-w-[22px] place-items-center rounded-full px-1.5 font-mono text-[10px] uppercase tracking-label transition ${
+                active
+                  ? option.key === "off"
+                    ? "bg-white/[0.08] text-[#c9b998]"
+                    : "bg-[#f5a45d]/20 text-[#f5a45d]"
+                  : "text-[#8f7f64] hover:text-[#decaa6]"
+              }`}
+            >
+              {option.key === "off" ? <VolumeX size={10} /> : option.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

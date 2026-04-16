@@ -275,23 +275,7 @@ export function compileMayaCharacter(seed: string): MayaCharacter {
       },
     ],
     project,
-    taskSkills: [
-      {
-        label: "Make a plan",
-        prompt: `Create a practical plan for ${project.name}.`,
-        outputType: "plan",
-      },
-      {
-        label: "Write in voice",
-        prompt: `Write a journal entry or artifact in ${name}'s voice.`,
-        outputType: "writing",
-      },
-      {
-        label: "Design the world",
-        prompt: `Create a new place, object, ritual, or scene from ${name}'s world.`,
-        outputType: "worldbuilding",
-      },
-    ],
+    taskSkills: roleTaskSkills(role, name, project.name, city),
     artifacts: [],
     lifeTrace: [
       {
@@ -402,8 +386,29 @@ function extractRole(seed: string) {
   const lower = seed.toLowerCase();
   if (lower.includes("architect")) return "Dream architect";
   if (lower.includes("founder") || lower.includes("startup")) return "Startup operator";
-  if (lower.includes("game")) return "Indie game developer";
-  if (lower.includes("writer")) return "Fiction writer";
+  if (lower.includes("game") && (lower.includes("dev") || lower.includes("indie"))) return "Indie game developer";
+  if (
+    lower.includes("singer") ||
+    lower.includes("musician") ||
+    lower.includes("vocalist") ||
+    lower.includes("composer")
+  )
+    return "Singer";
+  if (
+    lower.includes("influencer") ||
+    lower.includes("creator") ||
+    lower.includes("blogger") ||
+    lower.includes("vlogger")
+  )
+    return "Content creator";
+  if (lower.includes("photographer") || lower.includes("videographer")) return "Photographer";
+  if (lower.includes("chef") || lower.includes("cook") || lower.includes("baker")) return "Chef";
+  if (lower.includes("artist") || lower.includes("painter") || lower.includes("illustrator"))
+    return "Artist";
+  if (lower.includes("writer") || lower.includes("author") || lower.includes("journalist"))
+    return "Fiction writer";
+  if (lower.includes("developer") || lower.includes("engineer") || lower.includes("coder"))
+    return "Software engineer";
   if (lower.includes("designer")) return "World designer";
   if (lower.includes("guide")) return "Dream-world guide";
   return "World builder";
@@ -456,6 +461,65 @@ function extractProject(seed: string, role: string) {
     };
   }
 
+  if (role === "Singer") {
+    return {
+      name: "Live Tape",
+      description:
+        "A travelogue-meets-EP: field recordings from every city she performs in, stitched into a releasable tape.",
+      status: "Tracklist compiled by MAYA's Project Agent.",
+      playablePrompt: "Pick a city. Write the hook it gives you.",
+    };
+  }
+
+  if (role === "Content creator") {
+    return {
+      name: "Everyday Channel",
+      description:
+        "A weekly series turning ordinary days into short, honest films with a recurring cast of places.",
+      status: "Slate compiled by MAYA's Project Agent.",
+      playablePrompt: "Name a mundane moment. Turn it into a 30-second story.",
+    };
+  }
+
+  if (role === "Photographer") {
+    return {
+      name: "Field Notes",
+      description:
+        "A long-form visual journal: one frame + one paragraph per day, themed by season and street.",
+      status: "Frames compiled by MAYA's Project Agent.",
+      playablePrompt: "Pick a corner. Find its one true light.",
+    };
+  }
+
+  if (role === "Chef") {
+    return {
+      name: "Table of Origin",
+      description:
+        "A small tasting menu that traces a single ingredient from grower to plate, written like short stories.",
+      status: "Menu compiled by MAYA's Project Agent.",
+      playablePrompt: "Choose one ingredient. Plate its whole story.",
+    };
+  }
+
+  if (role === "Artist") {
+    return {
+      name: "Small Rooms",
+      description:
+        "A series of tiny paintings of imagined interiors — each one tied to a feeling the world forgot.",
+      status: "Series compiled by MAYA's Project Agent.",
+      playablePrompt: "Choose a feeling. Paint its furniture.",
+    };
+  }
+
+  if (role === "Fiction writer") {
+    return {
+      name: "Borrowed Cities",
+      description: "A chapbook of very short stories, each set in a real city the reader can step out into.",
+      status: "Chapbook compiled by MAYA's Project Agent.",
+      playablePrompt: "Name a street. Write who passes first.",
+    };
+  }
+
   return {
     name: "Inner World Prototype",
     description: "A living project that turns the seed into a usable world, artifact, or ritual.",
@@ -481,4 +545,81 @@ function titleCase(value: string) {
     .filter(Boolean)
     .map((word) => word[0]?.toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+function roleTaskSkills(
+  role: string,
+  name: string,
+  project: string,
+  city: string,
+): { label: string; prompt: string; outputType: string }[] {
+  const r = role.toLowerCase();
+  if (r.includes("singer")) {
+    return [
+      { label: "Write a song hook", prompt: `Write a 4-line song hook inspired by ${city}.`, outputType: "lyrics" },
+      { label: "Plan a live set", prompt: `Plan a 6-song setlist for an intimate ${city} show.`, outputType: "plan" },
+      { label: "Draft a show caption", prompt: `Write a warm, specific Instagram caption for tonight's show.`, outputType: "caption" },
+    ];
+  }
+  if (r.includes("content creator") || r.includes("creator")) {
+    return [
+      { label: "Draft a 30s Reel script", prompt: `Write a 30-second Reel script in my voice set in ${city}.`, outputType: "script" },
+      { label: "Plan a week of posts", prompt: `Plan 5 posts for the next week based on ${project}.`, outputType: "plan" },
+      { label: "Write a caption", prompt: `Write a caption for my latest frame — honest, specific, under 60 words.`, outputType: "caption" },
+    ];
+  }
+  if (r.includes("photographer")) {
+    return [
+      { label: "Shotlist a morning", prompt: `Build a 10-frame shotlist for a ${city} morning walk.`, outputType: "plan" },
+      { label: "Write a field note", prompt: `Write a 4-line field note to accompany today's frame.`, outputType: "writing" },
+      { label: "Pick a next story", prompt: `Name a small story in ${city} worth a week of frames.`, outputType: "pitch" },
+    ];
+  }
+  if (r.includes("chef") || r.includes("cook")) {
+    return [
+      { label: "Write a tasting menu", prompt: `Write a 5-course tasting menu tracing one ingredient.`, outputType: "menu" },
+      { label: "Draft a recipe card", prompt: `Draft a recipe card with one clear story and 6 steps.`, outputType: "recipe" },
+      { label: "Plan a pop-up night", prompt: `Plan a pop-up in ${city} built around ${project}.`, outputType: "plan" },
+    ];
+  }
+  if (r.includes("artist") || r.includes("painter")) {
+    return [
+      { label: "Sketch a small room", prompt: `Describe one painting for ${project} — subject, palette, and mood.`, outputType: "brief" },
+      { label: "Plan a show", prompt: `Plan a 7-piece show arc for ${project}.`, outputType: "plan" },
+      { label: "Write an artist note", prompt: `Write a 60-word artist note for the next painting.`, outputType: "writing" },
+    ];
+  }
+  if (r.includes("startup") || r.includes("operator")) {
+    return [
+      { label: "Draft a 3-day sprint", prompt: `Draft a 3-day sprint plan for ${project}.`, outputType: "plan" },
+      { label: "Write a one-pager", prompt: `Write a crisp investor one-pager for ${project}.`, outputType: "pitch" },
+      { label: "Name top 3 risks", prompt: `Name the 3 risks we're not taking seriously and why.`, outputType: "memo" },
+    ];
+  }
+  if (r.includes("writer") || r.includes("author")) {
+    return [
+      { label: "Write a short story", prompt: `Write a 120-word story set in ${city} that fits ${project}.`, outputType: "fiction" },
+      { label: "Draft a book chapter", prompt: `Draft an opening paragraph for a new chapter of ${project}.`, outputType: "fiction" },
+      { label: "Pitch a plot", prompt: `Pitch a three-beat plot for the next ${project} entry.`, outputType: "plan" },
+    ];
+  }
+  if (r.includes("architect")) {
+    return [
+      { label: "Design a dream room", prompt: `Describe a room that turns the feeling "restless" into a space.`, outputType: "worldbuilding" },
+      { label: "Write a ritual", prompt: `Write a 4-step ritual that fits inside ${project}.`, outputType: "ritual" },
+      { label: "Sketch a blueprint", prompt: `Sketch in words the blueprint of a small quiet place in ${project}.`, outputType: "brief" },
+    ];
+  }
+  if (r.includes("game") || r.includes("dev") || r.includes("engineer")) {
+    return [
+      { label: "Create sprint plan", prompt: `Create a 3-day sprint plan for ${project}.`, outputType: "plan" },
+      { label: "Write a devlog", prompt: `Write a short devlog in ${name}'s voice.`, outputType: "devlog" },
+      { label: "Design a mechanic", prompt: `Design one new mechanic for ${project}.`, outputType: "gamedesign" },
+    ];
+  }
+  return [
+    { label: "Make a plan", prompt: `Create a practical plan for ${project}.`, outputType: "plan" },
+    { label: "Write in voice", prompt: `Write a journal entry in ${name}'s voice.`, outputType: "writing" },
+    { label: "Design the world", prompt: `Create a new place, object, or ritual from ${name}'s world.`, outputType: "worldbuilding" },
+  ];
 }

@@ -2,14 +2,33 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { MayaCharacter } from "@/lib/maya-data";
+import type { MayaCharacter, RelationshipMode } from "@/lib/maya-data";
+
+export type AvatarMode = "stylized" | "cinematic" | "minimal";
 
 type AvatarStageProps = {
   character: MayaCharacter;
   size?: "full" | "compact" | "hero";
+  avatarMode?: AvatarMode;
+  relationshipMode?: RelationshipMode;
 };
 
-export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
+const modeAccents: Record<RelationshipMode, string> = {
+  friend: "#f5a45d",
+  assistant: "#7fb3d4",
+  muse: "#c78bd9",
+  npc: "#9fb07f",
+  guide: "#8fc4bd",
+  operator: "#e67650",
+  coach: "#c9d6ae",
+};
+
+export function AvatarStage({
+  character,
+  size = "full",
+  avatarMode = "stylized",
+  relationshipMode,
+}: AvatarStageProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
 
@@ -35,7 +54,9 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
 
     const palette = character.avatar.palette;
     const primary = palette[0] ?? "#9fb07f";
-    const accent = palette[1] ?? "#f5a45d";
+    const paletteAccent = palette[1] ?? "#f5a45d";
+    const activeMode = relationshipMode ?? character.relationshipMode;
+    const accent = activeMode ? modeAccents[activeMode] : paletteAccent;
     const dark = palette[2] ?? "#120f0b";
     const light = palette[3] ?? "#f7ead2";
 
@@ -46,6 +67,41 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     const isStartup = roleLower.includes("startup") || roleLower.includes("operator");
     const isRainy =
       env.includes("rain") || env.includes("monsoon") || traits.includes("monsoon");
+    const wearsGlasses = traits.includes("glass") || traits.includes("spectacle");
+    const isCinematic = avatarMode === "cinematic";
+    const isMinimal = avatarMode === "minimal";
+    const isSinger =
+      roleLower.includes("singer") ||
+      roleLower.includes("musician") ||
+      roleLower.includes("vocalist") ||
+      roleLower.includes("composer");
+    const isInfluencer =
+      roleLower.includes("influencer") ||
+      roleLower.includes("creator") ||
+      roleLower.includes("blogger") ||
+      roleLower.includes("vlogger");
+    const isWriter =
+      roleLower.includes("writer") ||
+      roleLower.includes("author") ||
+      roleLower.includes("journalist") ||
+      roleLower.includes("poet");
+    const isArtist =
+      (roleLower.includes("artist") ||
+        roleLower.includes("painter") ||
+        roleLower.includes("illustrator")) &&
+      !isGarden;
+    const isChef =
+      roleLower.includes("chef") ||
+      roleLower.includes("cook") ||
+      roleLower.includes("baker");
+    const isPhotographer =
+      roleLower.includes("photographer") || roleLower.includes("videographer");
+    const isDev =
+      roleLower.includes("developer") ||
+      roleLower.includes("engineer") ||
+      roleLower.includes("coder") ||
+      roleLower.includes("programmer") ||
+      roleLower.includes("hacker");
 
     const scene = new THREE.Scene();
 
@@ -265,7 +321,9 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
       leftTemple,
       rightTemple,
     );
-    head.add(glassesGroup);
+    if (wearsGlasses) {
+      head.add(glassesGroup);
+    }
 
     function makeArm(side: 1 | -1) {
       const arm = new THREE.Group();
@@ -335,7 +393,85 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
         block.castShadow = true;
         prop.add(block);
       }
-    } else {
+    } else if (isSinger) {
+      const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.42, 14), ink);
+      stand.position.set(0.14, -0.12, 0.55);
+      stand.rotation.z = -0.18;
+      stand.castShadow = true;
+      const micHead = new THREE.Mesh(new THREE.SphereGeometry(0.09, 20, 16), ink);
+      micHead.position.set(0.2, 0.09, 0.58);
+      micHead.castShadow = true;
+      const micMesh = new THREE.Mesh(new THREE.SphereGeometry(0.1, 24, 16), new THREE.MeshStandardMaterial({
+        color: shadeHSL(accent, -0.05),
+        roughness: 0.6,
+        metalness: 0.4,
+        wireframe: true,
+      }));
+      micMesh.position.copy(micHead.position);
+      micMesh.scale.setScalar(0.96);
+      prop.add(stand, micHead, micMesh);
+    } else if (isInfluencer) {
+      const phone = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.4, 0.03), ink);
+      phone.position.set(0.22, 0.15, 0.52);
+      phone.rotation.z = -0.12;
+      phone.castShadow = true;
+      const phoneScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.34), paper);
+      phoneScreen.position.set(0.22, 0.15, 0.537);
+      phoneScreen.rotation.z = -0.12;
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.32, 0.018, 12, 40),
+        new THREE.MeshBasicMaterial({ color: light, transparent: true, opacity: 0.8 }),
+      );
+      ring.position.set(-0.45, 0.4, 0.3);
+      prop.add(phone, phoneScreen, ring);
+    } else if (isWriter) {
+      const book = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.06, 0.34), paper);
+      book.position.set(0, -0.08, 0.5);
+      book.castShadow = true;
+      const spine = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.06, 0.02), ember);
+      spine.position.set(0, -0.06, 0.34);
+      const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.22, 10), ink);
+      pen.position.set(0.12, -0.04, 0.55);
+      pen.rotation.z = Math.PI / 2;
+      prop.add(book, spine, pen);
+    } else if (isArtist) {
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.03, 0.54), paper);
+      pad.position.set(0, -0.1, 0.48);
+      pad.castShadow = true;
+      const brush = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 10), ink);
+      brush.position.set(0.22, -0.04, 0.6);
+      brush.rotation.z = 1.0;
+      const splatGeom = new THREE.CircleGeometry(0.05, 16);
+      const splatMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6 });
+      const splat = new THREE.Mesh(splatGeom, splatMat);
+      splat.position.set(0, -0.086, 0.51);
+      splat.rotation.x = -Math.PI / 2;
+      prop.add(pad, brush, splat);
+    } else if (isChef) {
+      const apron = new THREE.Mesh(
+        new THREE.BoxGeometry(0.62, 0.75, 0.02),
+        new THREE.MeshStandardMaterial({ color: "#f2e6c9", roughness: 0.8 }),
+      );
+      apron.position.set(0, 0.12, 0.4);
+      const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 28), ink);
+      pan.position.set(0, -0.08, 0.52);
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.05), ink);
+      handle.position.set(0.32, -0.08, 0.52);
+      prop.add(apron, pan, handle);
+    } else if (isPhotographer) {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.28, 0.22), ink);
+      body.position.set(0, 0.05, 0.52);
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.16, 24), ink);
+      lens.position.set(0, 0.05, 0.66);
+      lens.rotation.x = Math.PI / 2;
+      const glassFront = new THREE.Mesh(new THREE.CircleGeometry(0.1, 20), new THREE.MeshStandardMaterial({
+        color: accent,
+        emissive: accent,
+        emissiveIntensity: 0.6,
+      }));
+      glassFront.position.set(0, 0.05, 0.74);
+      prop.add(body, lens, glassFront);
+    } else if (isDev || roleLower.includes("indie") || roleLower.includes("game")) {
       const base = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.04, 0.58), ink);
       base.position.set(0, -0.12, 0.52);
       base.castShadow = true;
@@ -349,6 +485,24 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
       sticker.position.set(0.28, 0.23, 0.278);
       sticker.rotation.x = -0.34;
       prop.add(base, screen, screenFace, sticker);
+    } else {
+      const orb = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.18, 1),
+        new THREE.MeshStandardMaterial({
+          color: accent,
+          emissive: accent,
+          emissiveIntensity: 0.45,
+          roughness: 0.3,
+        }),
+      );
+      orb.position.set(0.08, 0.05, 0.55);
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.26, 0.008, 10, 40),
+        new THREE.MeshBasicMaterial({ color: primary, transparent: true, opacity: 0.7 }),
+      );
+      ring.position.copy(orb.position);
+      ring.rotation.x = Math.PI / 3;
+      prop.add(orb, ring);
     }
     figure.add(prop);
 
@@ -404,9 +558,9 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
       spark.position.set(Math.cos(angle) * 2.3, platformY + 0.1, Math.sin(angle) * 2.3);
       orbitSparks.add(spark);
     }
-    scene.add(orbitSparks);
+    if (!isMinimal) scene.add(orbitSparks);
 
-    const dustCount = 220;
+    const dustCount = isMinimal ? 40 : 220;
     const dustGeom = new THREE.BufferGeometry();
     const dustPos = new Float32Array(dustCount * 3);
     const dustSpeed = new Float32Array(dustCount);
@@ -431,7 +585,7 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     scene.add(dust);
 
     let rain: THREE.Group | null = null;
-    if (isRainy) {
+    if (isRainy && !isMinimal) {
       rain = new THREE.Group();
       const rainMat = new THREE.LineBasicMaterial({
         color: "#c9d6ae",
@@ -462,22 +616,23 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     ];
     bokehLayout.forEach((p, i) => {
       const bokeh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.18, 12, 10),
+        new THREE.SphereGeometry(isCinematic ? 0.24 : 0.18, 12, 10),
         new THREE.MeshBasicMaterial({
           color: i % 2 === 0 ? accent : primary,
           transparent: true,
-          opacity: 0.22,
+          opacity: isCinematic ? 0.3 : 0.22,
         }),
       );
       bokeh.position.set(p.x, p.y, p.z);
       bokehGroup.add(bokeh);
     });
-    scene.add(bokehGroup);
+    if (!isMinimal) scene.add(bokehGroup);
 
-    const hemi = new THREE.HemisphereLight(light, shadeHSL(dark, 0.02), 1.15);
+    const hemiIntensity = isCinematic ? 0.6 : isMinimal ? 1.3 : 1.15;
+    const hemi = new THREE.HemisphereLight(light, shadeHSL(dark, 0.02), hemiIntensity);
     scene.add(hemi);
 
-    const key = new THREE.DirectionalLight(accent, 2.6);
+    const key = new THREE.DirectionalLight(accent, isCinematic ? 3.4 : 2.6);
     key.position.set(3.5, 5, 4);
     key.castShadow = true;
     key.shadow.mapSize.width = 1024;
@@ -486,7 +641,7 @@ export function AvatarStage({ character, size = "full" }: AvatarStageProps) {
     key.shadow.camera.far = 20;
     scene.add(key);
 
-    const rim = new THREE.DirectionalLight(primary, 1.8);
+    const rim = new THREE.DirectionalLight(primary, isCinematic ? 2.5 : isMinimal ? 1.2 : 1.8);
     rim.position.set(-3.5, 3.5, -3);
     scene.add(rim);
 
